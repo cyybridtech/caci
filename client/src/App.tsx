@@ -10,6 +10,7 @@ import { FinancesView } from './components/FinancesView.tsx';
 import { MessagingView } from './components/MessagingView.tsx';
 import { CelebrationsView } from './components/CelebrationsView.tsx';
 import { CampaignsView } from './components/CampaignsView.tsx';
+import { Footer } from './components/Footer.tsx';
 import { MemberAttendanceHistoryModal } from './components/MemberAttendanceHistoryModal.tsx';
 import { api } from './services/api.ts';
 import { offlineSync } from './services/offlineSync.ts';
@@ -535,6 +536,9 @@ export const App: React.FC = () => {
           </>
         )}
       </main>
+
+      {/* Application Footer */}
+      <Footer />
 
       {/* Member Attendance History Audit Modal */}
       <MemberAttendanceHistoryModal

@@ -98,6 +98,9 @@ export const Header: React.FC<HeaderProps> = ({
               <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40">
                 Media Desk Kiosk
               </span>
+              <span className="hidden sm:inline-block text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-900/60 text-blue-300 border border-blue-500/30">
+                by Cyybrid Technology
+              </span>
             </div>
             <p className="text-[11px] text-slate-400">Christ Apostolic Church Int. Management System</p>
           </div>
