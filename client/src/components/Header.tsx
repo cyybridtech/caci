@@ -184,130 +184,144 @@ export const Header: React.FC<HeaderProps> = ({
         </div>
       </div>
 
-      {/* Navigation Tabs */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex overflow-x-auto scrollbar-none py-1 space-x-1 border-t border-slate-800">
-        <button
-          onClick={() => setActiveTab('checkin')}
-          className={`flex items-center space-x-2 px-3.5 py-2 text-xs font-bold rounded-t-xl transition border-b-2 whitespace-nowrap ${
-            activeTab === 'checkin'
-              ? 'border-blue-500 text-blue-400 bg-slate-800/80 shadow-sm'
-              : 'border-transparent text-slate-400 hover:text-slate-200 hover:bg-slate-800/40'
-          }`}
-        >
-          <CheckCircle2 className="w-4 h-4" />
-          <span>Check-In Desk</span>
-        </button>
+      {/* Navigation Tabs - High-Density, Zero-Scroll Segmented Responsive Grid */}
+      <div className="max-w-7xl mx-auto px-2 sm:px-4 lg:px-8 py-2 border-t border-slate-800">
+        <nav className="grid grid-cols-5 lg:grid-cols-10 gap-1 bg-slate-950/60 p-1.5 rounded-2xl border border-slate-800/80 shadow-inner">
+          {/* 1. Check-In */}
+          <button
+            onClick={() => setActiveTab('checkin')}
+            className={`flex flex-col sm:flex-row items-center justify-center space-y-0.5 sm:space-y-0 sm:space-x-1.5 px-2 py-2 rounded-xl text-xs font-bold transition duration-150 ${
+              activeTab === 'checkin'
+                ? 'bg-blue-600 text-white shadow-md shadow-blue-900/30'
+                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
+            }`}
+          >
+            <CheckCircle2 className="w-4 h-4 shrink-0" />
+            <span className="truncate">Check-In</span>
+          </button>
 
-        <button
-          onClick={() => setActiveTab('members')}
-          className={`flex items-center space-x-2 px-3.5 py-2 text-xs font-bold rounded-t-xl transition border-b-2 whitespace-nowrap ${
-            activeTab === 'members'
-              ? 'border-blue-500 text-blue-400 bg-slate-800/80 shadow-sm'
-              : 'border-transparent text-slate-400 hover:text-slate-200 hover:bg-slate-800/40'
-          }`}
-        >
-          <Users className="w-4 h-4" />
-          <span>Members</span>
-        </button>
+          {/* 2. Members */}
+          <button
+            onClick={() => setActiveTab('members')}
+            className={`flex flex-col sm:flex-row items-center justify-center space-y-0.5 sm:space-y-0 sm:space-x-1.5 px-2 py-2 rounded-xl text-xs font-bold transition duration-150 ${
+              activeTab === 'members'
+                ? 'bg-blue-600 text-white shadow-md shadow-blue-900/30'
+                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
+            }`}
+          >
+            <Users className="w-4 h-4 shrink-0" />
+            <span className="truncate">Members</span>
+          </button>
 
-        <button
-          onClick={() => setActiveTab('attendance-history')}
-          className={`flex items-center space-x-2 px-3.5 py-2 text-xs font-bold rounded-t-xl transition border-b-2 whitespace-nowrap ${
-            activeTab === 'attendance-history'
-              ? 'border-amber-500 text-amber-400 bg-slate-800/80 shadow-sm'
-              : 'border-transparent text-slate-400 hover:text-slate-200 hover:bg-slate-800/40'
-          }`}
-        >
-          <History className="w-4 h-4" />
-          <span>Attendance Audit & History</span>
-        </button>
+          {/* 3. Audit Log */}
+          <button
+            onClick={() => setActiveTab('attendance-history')}
+            className={`flex flex-col sm:flex-row items-center justify-center space-y-0.5 sm:space-y-0 sm:space-x-1.5 px-2 py-2 rounded-xl text-xs font-bold transition duration-150 ${
+              activeTab === 'attendance-history'
+                ? 'bg-amber-600 text-white shadow-md shadow-amber-900/30'
+                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
+            }`}
+          >
+            <History className="w-4 h-4 shrink-0" />
+            <span className="truncate">Audit</span>
+          </button>
 
-        <button
-          onClick={() => setActiveTab('analytics')}
-          className={`flex items-center space-x-2 px-3.5 py-2 text-xs font-bold rounded-t-xl transition border-b-2 whitespace-nowrap ${
-            activeTab === 'analytics'
-              ? 'border-blue-500 text-blue-400 bg-slate-800/80 shadow-sm'
-              : 'border-transparent text-slate-400 hover:text-slate-200 hover:bg-slate-800/40'
-          }`}
-        >
-          <TrendingUp className="w-4 h-4" />
-          <span>Executive Analytics</span>
-        </button>
+          {/* 4. Visitors */}
+          <button
+            onClick={() => setActiveTab('pipeline')}
+            className={`flex flex-col sm:flex-row items-center justify-center space-y-0.5 sm:space-y-0 sm:space-x-1.5 px-2 py-2 rounded-xl text-xs font-bold transition duration-150 ${
+              activeTab === 'pipeline'
+                ? 'bg-amber-600 text-white shadow-md shadow-amber-900/30'
+                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
+            }`}
+          >
+            <UserCheck className="w-4 h-4 shrink-0" />
+            <span className="truncate">Visitors</span>
+          </button>
 
-        <button
-          onClick={() => setActiveTab('pipeline')}
-          className={`flex items-center space-x-2 px-3.5 py-2 text-xs font-bold rounded-t-xl transition border-b-2 whitespace-nowrap ${
-            activeTab === 'pipeline'
-              ? 'border-amber-500 text-amber-400 bg-slate-800/80 shadow-sm'
-              : 'border-transparent text-slate-400 hover:text-slate-200 hover:bg-slate-800/40'
-          }`}
-        >
-          <UserCheck className="w-4 h-4" />
-          <span>Visitor Pipeline</span>
-        </button>
+          {/* 5. Auxiliaries */}
+          <button
+            onClick={() => setActiveTab('departments')}
+            className={`flex flex-col sm:flex-row items-center justify-center space-y-0.5 sm:space-y-0 sm:space-x-1.5 px-2 py-2 rounded-xl text-xs font-bold transition duration-150 ${
+              activeTab === 'departments'
+                ? 'bg-purple-600 text-white shadow-md shadow-purple-900/30'
+                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
+            }`}
+          >
+            <Building2 className="w-4 h-4 shrink-0" />
+            <span className="truncate">Auxiliaries</span>
+          </button>
 
-        <button
-          onClick={() => setActiveTab('departments')}
-          className={`flex items-center space-x-2 px-3.5 py-2 text-xs font-bold rounded-t-xl transition border-b-2 whitespace-nowrap ${
-            activeTab === 'departments'
-              ? 'border-purple-500 text-purple-400 bg-slate-800/80 shadow-sm'
-              : 'border-transparent text-slate-400 hover:text-slate-200 hover:bg-slate-800/40'
-          }`}
-        >
-          <Building2 className="w-4 h-4" />
-          <span>Auxiliaries</span>
-        </button>
+          {/* 6. Finances */}
+          <button
+            onClick={() => setActiveTab('finances')}
+            className={`flex flex-col sm:flex-row items-center justify-center space-y-0.5 sm:space-y-0 sm:space-x-1.5 px-2 py-2 rounded-xl text-xs font-bold transition duration-150 ${
+              activeTab === 'finances'
+                ? 'bg-emerald-600 text-white shadow-md shadow-emerald-900/30'
+                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
+            }`}
+          >
+            <DollarSign className="w-4 h-4 shrink-0" />
+            <span className="truncate">Finances</span>
+          </button>
 
-        <button
-          onClick={() => setActiveTab('finances')}
-          className={`flex items-center space-x-2 px-3.5 py-2 text-xs font-bold rounded-t-xl transition border-b-2 whitespace-nowrap ${
-            activeTab === 'finances'
-              ? 'border-emerald-500 text-emerald-400 bg-slate-800/80 shadow-sm'
-              : 'border-transparent text-slate-400 hover:text-slate-200 hover:bg-slate-800/40'
-          }`}
-        >
-          <DollarSign className="w-4 h-4" />
-          <span>Finances (GH₵)</span>
-        </button>
+          {/* 7. Pledges */}
+          <button
+            onClick={() => setActiveTab('campaigns')}
+            className={`flex flex-col sm:flex-row items-center justify-center space-y-0.5 sm:space-y-0 sm:space-x-1.5 px-2 py-2 rounded-xl text-xs font-bold transition duration-150 ${
+              activeTab === 'campaigns'
+                ? 'bg-indigo-600 text-white shadow-md shadow-indigo-900/30'
+                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
+            }`}
+          >
+            <Building className="w-4 h-4 shrink-0" />
+            <span className="truncate">Pledges</span>
+          </button>
 
-        <button
-          onClick={() => setActiveTab('campaigns')}
-          className={`flex items-center space-x-2 px-3.5 py-2 text-xs font-bold rounded-t-xl transition border-b-2 whitespace-nowrap ${
-            activeTab === 'campaigns'
-              ? 'border-indigo-500 text-indigo-400 bg-slate-800/80 shadow-sm'
-              : 'border-transparent text-slate-400 hover:text-slate-200 hover:bg-slate-800/40'
-          }`}
-        >
-          <Building className="w-4 h-4" />
-          <span>Pledges & Harvest</span>
-        </button>
+          {/* 8. Celebrations */}
+          <button
+            onClick={() => setActiveTab('celebrations')}
+            className={`flex flex-col sm:flex-row items-center justify-center space-y-0.5 sm:space-y-0 sm:space-x-1.5 px-2 py-2 rounded-xl text-xs font-bold transition duration-150 relative ${
+              activeTab === 'celebrations'
+                ? 'bg-rose-600 text-white shadow-md shadow-rose-900/30'
+                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
+            }`}
+          >
+            <div className="relative flex items-center">
+              <Cake className="w-4 h-4 shrink-0" />
+              {typeof todayCelebrantsCount === 'number' && todayCelebrantsCount > 0 && (
+                <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-rose-400 animate-pulse"></span>
+              )}
+            </div>
+            <span className="truncate">Celebrations</span>
+          </button>
 
-        <button
-          onClick={() => setActiveTab('celebrations')}
-          className={`flex items-center space-x-2 px-3.5 py-2 text-xs font-bold rounded-t-xl transition border-b-2 whitespace-nowrap relative ${
-            activeTab === 'celebrations'
-              ? 'border-rose-500 text-rose-400 bg-slate-800/80 shadow-sm'
-              : 'border-transparent text-slate-400 hover:text-slate-200 hover:bg-slate-800/40'
-          }`}
-        >
-          <Cake className="w-4 h-4" />
-          <span>Celebrations</span>
-          {typeof todayCelebrantsCount === 'number' && todayCelebrantsCount > 0 && (
-            <span className="w-2 h-2 rounded-full bg-rose-500 animate-pulse"></span>
-          )}
-        </button>
+          {/* 9. SMS & WhatsApp */}
+          <button
+            onClick={() => setActiveTab('messaging')}
+            className={`flex flex-col sm:flex-row items-center justify-center space-y-0.5 sm:space-y-0 sm:space-x-1.5 px-2 py-2 rounded-xl text-xs font-bold transition duration-150 ${
+              activeTab === 'messaging'
+                ? 'bg-cyan-600 text-white shadow-md shadow-cyan-900/30'
+                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
+            }`}
+          >
+            <MessageSquare className="w-4 h-4 shrink-0" />
+            <span className="truncate">SMS Broadcast</span>
+          </button>
 
-        <button
-          onClick={() => setActiveTab('messaging')}
-          className={`flex items-center space-x-2 px-3.5 py-2 text-xs font-bold rounded-t-xl transition border-b-2 whitespace-nowrap ${
-            activeTab === 'messaging'
-              ? 'border-blue-500 text-blue-400 bg-slate-800/80 shadow-sm'
-              : 'border-transparent text-slate-400 hover:text-slate-200 hover:bg-slate-800/40'
-          }`}
-        >
-          <MessageSquare className="w-4 h-4" />
-          <span>SMS & WhatsApp</span>
-        </button>
+          {/* 10. Analytics */}
+          <button
+            onClick={() => setActiveTab('analytics')}
+            className={`flex flex-col sm:flex-row items-center justify-center space-y-0.5 sm:space-y-0 sm:space-x-1.5 px-2 py-2 rounded-xl text-xs font-bold transition duration-150 ${
+              activeTab === 'analytics'
+                ? 'bg-blue-700 text-white shadow-md shadow-blue-950/40'
+                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
+            }`}
+          >
+            <TrendingUp className="w-4 h-4 shrink-0" />
+            <span className="truncate">Analytics</span>
+          </button>
+        </nav>
       </div>
 
       {/* New Service Session Modal */}
