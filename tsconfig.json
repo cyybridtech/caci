@@ -12,5 +12,5 @@
     "rootDir": "."
   },
   "include": ["api/**/*", "server/src/**/*"],
-  "exclude": ["node_modules", "client", "dist"]
+  "exclude": ["node_modules", "client", "dist", "server/node_modules"]
 }
