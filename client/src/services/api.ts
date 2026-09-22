@@ -15,7 +15,7 @@ import {
   PledgePayment
 } from '../types/index.ts';
 
-const BASE_URL = '/api';
+const BASE_URL = (import.meta.env.VITE_API_URL as string) || '/api';
 
 export const api = {
   // Members
