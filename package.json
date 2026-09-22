@@ -1,21 +1,28 @@
 {
   "name": "caci-church-management-system",
   "version": "1.0.0",
-  "description": "Church Attendance & Management System for CACI",
+  "description": "Church Attendance & Management System for CACI — by Cyybrid Technology",
   "private": true,
-  "workspaces": [
-    "client",
-    "server"
-  ],
   "scripts": {
     "dev": "concurrently \"npm run dev --prefix server\" \"npm run dev --prefix client\"",
     "build": "npm run build --prefix client",
     "build:all": "npm run build --prefix server && npm run build --prefix client",
-    "build:client": "npm run build --prefix client",
-    "build:server": "npm run build --prefix server",
-    "install-all": "npm install"
+    "vercel-build": "prisma generate --schema=server/prisma/schema.prisma && npm run build --prefix client"
+  },
+  "dependencies": {
+    "@prisma/client": "^6.4.1",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "mysql2": "^3.24.4",
+    "prisma": "^6.4.1"
   },
   "devDependencies": {
-    "concurrently": "^9.1.0"
+    "@types/cors": "^2.8.17",
+    "@types/express": "^5.0.0",
+    "@types/node": "^22.13.5",
+    "concurrently": "^9.1.0",
+    "tsx": "^4.19.3",
+    "typescript": "^5.7.3"
   }
 }
