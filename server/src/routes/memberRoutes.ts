@@ -7,7 +7,7 @@ export const memberRouter = Router();
 // GET /api/members/:id/attendance-history
 memberRouter.get('/:id/attendance-history', async (req: Request, res: Response) => {
   try {
-    const { id } = req.params;
+    const id = req.params.id as string;
 
     const member = await prisma.member.findUnique({
       where: { id },
@@ -34,7 +34,7 @@ memberRouter.get('/:id/attendance-history', async (req: Request, res: Response) 
 
     const attendedSessionIds = new Set(attendanceRecords.map((r) => r.sessionId));
 
-    const attendedList = attendanceRecords.map((r) => ({
+    const attendedList = attendanceRecords.map((r: any) => ({
       sessionId: r.sessionId,
       serviceDate: r.session.serviceDate,
       serviceType: r.session.serviceType,
@@ -129,7 +129,7 @@ memberRouter.get('/', async (req: Request, res: Response) => {
 // GET /api/members/:id - member details
 memberRouter.get('/:id', async (req: Request, res: Response) => {
   try {
-    const { id } = req.params;
+    const id = req.params.id as string;
     const member = await prisma.member.findUnique({
       where: { id },
       include: {
@@ -226,7 +226,7 @@ memberRouter.post('/', async (req: Request, res: Response) => {
 // PUT /api/members/:id - update member
 memberRouter.put('/:id', async (req: Request, res: Response) => {
   try {
-    const { id } = req.params;
+    const id = req.params.id as string;
     const {
       firstName,
       lastName,
@@ -284,7 +284,7 @@ memberRouter.put('/:id', async (req: Request, res: Response) => {
 // DELETE /api/members/:id
 memberRouter.delete('/:id', async (req: Request, res: Response) => {
   try {
-    const { id } = req.params;
+    const id = req.params.id as string;
     await prisma.member.delete({ where: { id } });
     res.json({ success: true, message: 'Member deleted successfully' });
   } catch (error: any) {

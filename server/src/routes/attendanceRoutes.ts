@@ -157,7 +157,7 @@ attendanceRouter.get('/analytics', async (req: Request, res: Response) => {
 // GET /api/attendance/session/:sessionId - all check-ins for a session
 attendanceRouter.get('/session/:sessionId', async (req: Request, res: Response) => {
   try {
-    const { sessionId } = req.params;
+    const sessionId = req.params.sessionId as string;
 
     const records = await prisma.attendanceRecord.findMany({
       where: { sessionId },
@@ -267,7 +267,7 @@ attendanceRouter.post('/undo', async (req: Request, res: Response) => {
 // GET /api/attendance/stats/:sessionId - live headcount counters
 attendanceRouter.get('/stats/:sessionId', async (req: Request, res: Response) => {
   try {
-    const { sessionId } = req.params;
+    const sessionId = req.params.sessionId as string;
 
     const totalMembers = await prisma.member.count({
       where: { status: 'ACTIVE' }

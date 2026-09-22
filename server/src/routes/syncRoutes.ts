@@ -55,7 +55,6 @@ syncRouter.post('/', async (req: Request, res: Response) => {
             category: category || FinancialCategory.OFFERING,
             amount: Number(amount),
             paymentMethod: paymentMethod || PaymentMethod.CASH,
-            referenceCode: referenceCode || 'OFFLINE-SYNC',
             notes: notes ? `${notes} (Synced from offline)` : 'Synced from offline',
             transactionDate: transactionDate ? new Date(transactionDate) : new Date()
           }

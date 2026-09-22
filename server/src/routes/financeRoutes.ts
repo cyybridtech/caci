@@ -175,7 +175,7 @@ financeRouter.get('/summary', async (req: Request, res: Response) => {
 // GET /api/finances/member/:memberId - giving statement for member
 financeRouter.get('/member/:memberId', async (req: Request, res: Response) => {
   try {
-    const { memberId } = req.params;
+    const memberId = req.params.memberId as string;
 
     const member = await prisma.member.findUnique({
       where: { id: memberId },
