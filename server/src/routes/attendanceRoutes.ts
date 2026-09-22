@@ -4,7 +4,7 @@ import { ChurchGroup } from '@prisma/client';
 
 export const attendanceRouter = Router();
 
-// GET /api/attendance/analytics - executive pastoral analytics & trends (weekly + monthly)
+// GET /api/attendance/analytics - executive pastoral analytics & growth/drop trends
 attendanceRouter.get('/analytics', async (req: Request, res: Response) => {
   try {
     const totalMembers = await prisma.member.count({ where: { status: 'ACTIVE' } });
@@ -26,9 +26,9 @@ attendanceRouter.get('/analytics', async (req: Request, res: Response) => {
       }
     });
 
-    // 1. Weekly Trends (Last 8-12 sessions chronological)
+    // 1. Weekly Trends (Last 10 sessions in chronological order)
     const recentSessions = allSessions.slice(0, 10).reverse();
-    const weeklyTrends = recentSessions.map(s => {
+    const rawWeekly = recentSessions.map(s => {
       const presentCount = s.attendance.length;
       const g1 = s.attendance.filter(a => a.member.churchGroup === ChurchGroup.GROUP_1).length;
       const g2 = s.attendance.filter(a => a.member.churchGroup === ChurchGroup.GROUP_2).length;
@@ -41,6 +41,27 @@ attendanceRouter.get('/analytics', async (req: Request, res: Response) => {
         group1Present: g1,
         group2Present: g2,
         turnoutPercentage: totalMembers > 0 ? Math.round((presentCount / totalMembers) * 100) : 0
+      };
+    });
+
+    // Calculate delta (dropped vs increased) for each service
+    const weeklyTrends = rawWeekly.map((item, idx, arr) => {
+      if (idx === 0) {
+        return {
+          ...item,
+          netChange: 0,
+          percentChange: 0,
+          trendStatus: 'STABLE' as const
+        };
+      }
+      const prev = arr[idx - 1];
+      const net = item.totalPresent - prev.totalPresent;
+      const pct = prev.totalPresent > 0 ? Math.round((net / prev.totalPresent) * 100) : (net > 0 ? 100 : 0);
+      return {
+        ...item,
+        netChange: net,
+        percentChange: pct,
+        trendStatus: net > 0 ? ('INCREASED' as const) : net < 0 ? ('DROPPED' as const) : ('STABLE' as const)
       };
     });
 
@@ -80,8 +101,8 @@ attendanceRouter.get('/analytics', async (req: Request, res: Response) => {
       session.attendance.forEach(a => mData.uniqueMemberIds.add(a.member.id));
     }
 
-    // Sort months chronologically
-    const monthlyTrends = Array.from(monthMap.values())
+    // Sort months chronologically and calculate deltas
+    const rawMonthly = Array.from(monthMap.values())
       .sort((a, b) => a.monthKey.localeCompare(b.monthKey))
       .map(m => {
         const sCount = m.services.length || 1;
@@ -101,7 +122,51 @@ attendanceRouter.get('/analytics', async (req: Request, res: Response) => {
         };
       });
 
-    // 3. Absentee Alerts (Members who missed the last 2 services)
+    const monthlyTrends = rawMonthly.map((item, idx, arr) => {
+      if (idx === 0) {
+        return {
+          ...item,
+          netChange: 0,
+          percentChange: 0,
+          trendStatus: 'STABLE' as const
+        };
+      }
+      const prev = arr[idx - 1];
+      const net = item.avgPresent - prev.avgPresent;
+      const pct = prev.avgPresent > 0 ? Math.round((net / prev.avgPresent) * 100) : (net > 0 ? 100 : 0);
+      return {
+        ...item,
+        netChange: net,
+        percentChange: pct,
+        trendStatus: net > 0 ? ('INCREASED' as const) : net < 0 ? ('DROPPED' as const) : ('STABLE' as const)
+      };
+    });
+
+    // 3. Executive Growth Summary vs Previous Service
+    const latestService = weeklyTrends.length > 0 ? weeklyTrends[weeklyTrends.length - 1] : null;
+    const priorService = weeklyTrends.length > 1 ? weeklyTrends[weeklyTrends.length - 2] : null;
+
+    const serviceGrowth = latestService && priorService ? {
+      latestCount: latestService.totalPresent,
+      priorCount: priorService.totalPresent,
+      netChange: latestService.totalPresent - priorService.totalPresent,
+      percentChange: priorService.totalPresent > 0
+        ? Math.round(((latestService.totalPresent - priorService.totalPresent) / priorService.totalPresent) * 100)
+        : (latestService.totalPresent > 0 ? 100 : 0),
+      status: (latestService.totalPresent > priorService.totalPresent
+        ? 'INCREASED'
+        : latestService.totalPresent < priorService.totalPresent
+        ? 'DROPPED'
+        : 'STABLE') as 'INCREASED' | 'DROPPED' | 'STABLE'
+    } : {
+      latestCount: latestService ? latestService.totalPresent : 0,
+      priorCount: 0,
+      netChange: 0,
+      percentChange: 0,
+      status: 'STABLE' as const
+    };
+
+    // 4. Absentee Alerts (Members who missed the last 2 services)
     let absenteeAlerts: any[] = [];
     if (allSessions.length >= 2) {
       const recent2 = allSessions.slice(0, 2);
@@ -113,7 +178,7 @@ attendanceRouter.get('/analytics', async (req: Request, res: Response) => {
       absenteeAlerts = allActive.filter(m => !attendedInRecent.has(m.id));
     }
 
-    // 4. Turnout by Department for the latest session
+    // 5. Turnout by Department for the latest session
     const departments = await prisma.department.findMany({
       include: {
         members: {
@@ -143,14 +208,124 @@ attendanceRouter.get('/analytics', async (req: Request, res: Response) => {
       totalMembers,
       group1Total,
       group2Total,
+      serviceGrowth,
       weeklyTrends,
       monthlyTrends,
       absenteeAlerts,
       departmentTurnout
     });
   } catch (error: any) {
-    console.error('Error calculating analytics:', error);
-    res.status(500).json({ error: 'Failed to calculate church analytics' });
+    console.error('Error fetching analytics:', error);
+    res.status(500).json({ error: 'Failed to fetch executive analytics' });
+  }
+});
+
+// POST /api/attendance/check-in - high-speed one-press check-in
+attendanceRouter.post('/check-in', async (req: Request, res: Response) => {
+  try {
+    const { sessionId, memberId, markedBy } = req.body;
+
+    if (!sessionId || !memberId) {
+      return res.status(400).json({ error: 'sessionId and memberId are required' });
+    }
+
+    // Verify session
+    const session = await prisma.serviceSession.findUnique({
+      where: { id: sessionId }
+    });
+    if (!session) {
+      return res.status(404).json({ error: 'Service session not found' });
+    }
+
+    // Verify member
+    const member = await prisma.member.findUnique({
+      where: { id: memberId }
+    });
+    if (!member) {
+      return res.status(404).json({ error: 'Member not found' });
+    }
+
+    // Idempotent upsert check
+    const existing = await prisma.attendanceRecord.findUnique({
+      where: {
+        sessionId_memberId: {
+          sessionId,
+          memberId
+        }
+      },
+      include: {
+        member: {
+          include: {
+            departments: {
+              include: {
+                department: true
+              }
+            }
+          }
+        }
+      }
+    });
+
+    if (existing) {
+      return res.json({
+        message: 'Member already checked in',
+        record: existing,
+        alreadyCheckedIn: true
+      });
+    }
+
+    const record = await prisma.attendanceRecord.create({
+      data: {
+        sessionId,
+        memberId,
+        markedBy: markedBy || 'Media Desk Operator'
+      },
+      include: {
+        member: {
+          include: {
+            departments: {
+              include: {
+                department: true
+              }
+            }
+          }
+        }
+      }
+    });
+
+    res.status(201).json({
+      message: 'Attendance recorded successfully',
+      record,
+      alreadyCheckedIn: false
+    });
+  } catch (error: any) {
+    console.error('Error recording attendance:', error);
+    res.status(500).json({ error: 'Failed to record attendance' });
+  }
+});
+
+// POST /api/attendance/undo - instant check-in undo
+attendanceRouter.post('/undo', async (req: Request, res: Response) => {
+  try {
+    const { sessionId, memberId } = req.body;
+
+    if (!sessionId || !memberId) {
+      return res.status(400).json({ error: 'sessionId and memberId are required' });
+    }
+
+    await prisma.attendanceRecord.delete({
+      where: {
+        sessionId_memberId: {
+          sessionId,
+          memberId
+        }
+      }
+    });
+
+    res.json({ success: true, message: 'Check-in successfully undone' });
+  } catch (error: any) {
+    console.error('Error undoing attendance:', error);
+    res.status(500).json({ error: 'Failed to undo attendance' });
   }
 });
 
@@ -178,89 +353,53 @@ attendanceRouter.get('/session/:sessionId', async (req: Request, res: Response) 
     res.json(records);
   } catch (error: any) {
     console.error('Error fetching session attendance:', error);
-    res.status(500).json({ error: 'Failed to fetch attendance records' });
+    res.status(500).json({ error: 'Failed to fetch session attendance' });
   }
 });
 
-// POST /api/attendance/check-in - rapid check-in
-attendanceRouter.post('/check-in', async (req: Request, res: Response) => {
+// GET /api/attendance/search - high-speed member search
+attendanceRouter.get('/search', async (req: Request, res: Response) => {
   try {
-    const { sessionId, memberId, markedBy } = req.body;
+    const { q, group } = req.query;
 
-    if (!sessionId || !memberId) {
-      return res.status(400).json({ error: 'sessionId and memberId are required' });
+    const whereClause: any = {
+      status: 'ACTIVE'
+    };
+
+    if (group && (group === 'GROUP_1' || group === 'GROUP_2')) {
+      whereClause.churchGroup = group as ChurchGroup;
     }
 
-    const existing = await prisma.attendanceRecord.findUnique({
-      where: {
-        sessionId_memberId: {
-          sessionId,
-          memberId
-        }
-      },
-      include: {
-        member: true
-      }
-    });
-
-    if (existing) {
-      return res.status(200).json({
-        message: 'Member is already checked in',
-        record: existing,
-        alreadyCheckedIn: true
-      });
+    if (q && typeof q === 'string' && q.trim().length > 0) {
+      const searchTerm = q.trim();
+      whereClause.OR = [
+        { firstName: { contains: searchTerm } },
+        { lastName: { contains: searchTerm } },
+        { memberCode: { contains: searchTerm } },
+        { phone: { contains: searchTerm } }
+      ];
     }
 
-    const record = await prisma.attendanceRecord.create({
-      data: {
-        sessionId,
-        memberId,
-        markedBy: markedBy || 'Media Desk'
-      },
+    const members = await prisma.member.findMany({
+      where: whereClause,
       include: {
-        member: {
+        departments: {
           include: {
-            departments: {
-              include: {
-                department: true
-              }
-            }
+            department: true
           }
         }
-      }
+      },
+      orderBy: [
+        { lastName: 'asc' },
+        { firstName: 'asc' }
+      ],
+      take: 50
     });
 
-    res.status(201).json({
-      message: 'Check-in successful',
-      record,
-      alreadyCheckedIn: false
-    });
+    res.json(members);
   } catch (error: any) {
-    console.error('Error during check-in:', error);
-    res.status(500).json({ error: 'Failed to record attendance' });
-  }
-});
-
-// POST /api/attendance/undo - undo check-in
-attendanceRouter.post('/undo', async (req: Request, res: Response) => {
-  try {
-    const { sessionId, memberId } = req.body;
-
-    if (!sessionId || !memberId) {
-      return res.status(400).json({ error: 'sessionId and memberId are required' });
-    }
-
-    await prisma.attendanceRecord.deleteMany({
-      where: {
-        sessionId,
-        memberId
-      }
-    });
-
-    res.json({ success: true, message: 'Check-in undone successfully' });
-  } catch (error: any) {
-    console.error('Error undoing check-in:', error);
-    res.status(500).json({ error: 'Failed to undo attendance' });
+    console.error('Error searching members for check-in:', error);
+    res.status(500).json({ error: 'Failed to search members' });
   }
 });
 
@@ -318,6 +457,6 @@ attendanceRouter.get('/stats/:sessionId', async (req: Request, res: Response) =>
     });
   } catch (error: any) {
     console.error('Error fetching attendance stats:', error);
-    res.status(500).json({ error: 'Failed to fetch attendance stats' });
+    res.status(500).json({ error: 'Failed to calculate stats' });
   }
 });

@@ -134,6 +134,13 @@ export interface AnalyticsData {
   totalMembers: number;
   group1Total: number;
   group2Total: number;
+  serviceGrowth?: {
+    latestCount: number;
+    priorCount: number;
+    netChange: number;
+    percentChange: number;
+    status: 'INCREASED' | 'DROPPED' | 'STABLE';
+  };
   weeklyTrends: {
     sessionId: string;
     date: string;
@@ -143,6 +150,9 @@ export interface AnalyticsData {
     group1Present: number;
     group2Present: number;
     turnoutPercentage: number;
+    netChange?: number;
+    percentChange?: number;
+    trendStatus?: 'INCREASED' | 'DROPPED' | 'STABLE';
   }[];
   monthlyTrends: {
     monthKey: string;
@@ -154,6 +164,9 @@ export interface AnalyticsData {
     avgGroup2Present: number;
     uniqueAttendeesCount: number;
     turnoutPercentage: number;
+    netChange?: number;
+    percentChange?: number;
+    trendStatus?: 'INCREASED' | 'DROPPED' | 'STABLE';
   }[];
   absenteeAlerts: {
     id: string;
