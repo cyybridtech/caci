@@ -8,6 +8,8 @@ import { AssimilationPipeline } from './components/AssimilationPipeline.tsx';
 import { DepartmentsView } from './components/DepartmentsView.tsx';
 import { FinancesView } from './components/FinancesView.tsx';
 import { MessagingView } from './components/MessagingView.tsx';
+import { CelebrationsView } from './components/CelebrationsView.tsx';
+import { CampaignsView } from './components/CampaignsView.tsx';
 import { MemberAttendanceHistoryModal } from './components/MemberAttendanceHistoryModal.tsx';
 import { api } from './services/api.ts';
 import { offlineSync } from './services/offlineSync.ts';
@@ -33,6 +35,8 @@ export const App: React.FC = () => {
     | 'pipeline'
     | 'departments'
     | 'finances'
+    | 'campaigns'
+    | 'celebrations'
     | 'messaging'
   >('checkin');
 
@@ -46,6 +50,7 @@ export const App: React.FC = () => {
   const [contributions, setContributions] = useState<FinancialContribution[]>([]);
   const [financialSummary, setFinancialSummary] = useState<FinancialSummary | null>(null);
   const [messageLogs, setMessageLogs] = useState<MessageLog[]>([]);
+  const [todayCelebrantsCount, setTodayCelebrantsCount] = useState<number>(0);
 
   // Modals
   const [inspectingHistoryMember, setInspectingHistoryMember] = useState<Member | null>(null);
@@ -92,12 +97,13 @@ export const App: React.FC = () => {
       setDepartments(fetchedDepts);
 
       if (fetchedActive) {
-        const [attRecords, attStats, fetchedFinances, finSummary, msgs] = await Promise.all([
+        const [attRecords, attStats, fetchedFinances, finSummary, msgs, celData] = await Promise.all([
           api.getSessionAttendance(fetchedActive.id),
           api.getAttendanceStats(fetchedActive.id),
           api.getFinances(),
           api.getFinancialSummary(),
-          api.getMessageLogs()
+          api.getMessageLogs(),
+          api.getTodayCelebrants().catch(() => [])
         ]);
 
         setAttendanceRecords(attRecords);
@@ -105,6 +111,10 @@ export const App: React.FC = () => {
         setContributions(fetchedFinances);
         setFinancialSummary(finSummary);
         setMessageLogs(msgs);
+        setTodayCelebrantsCount(Array.isArray(celData) ? celData.length : 0);
+      } else {
+        const celData = await api.getTodayCelebrants().catch(() => []);
+        setTodayCelebrantsCount(Array.isArray(celData) ? celData.length : 0);
       }
     } catch (err) {
       console.error('Failed loading church data:', err);
@@ -430,6 +440,7 @@ export const App: React.FC = () => {
         offlineQueueCount={offlineQueueCount}
         onSync={handleManualSync}
         isSyncing={isSyncing}
+        todayCelebrantsCount={todayCelebrantsCount}
       />
 
       {/* Main Workspace Body */}
@@ -495,6 +506,17 @@ export const App: React.FC = () => {
                 members={members}
                 session={activeSession}
                 onRecordContribution={handleRecordContribution}
+              />
+            )}
+
+            {activeTab === 'campaigns' && (
+              <CampaignsView
+                members={members}
+              />
+            )}
+
+            {activeTab === 'celebrations' && (
+              <CelebrationsView
               />
             )}
 

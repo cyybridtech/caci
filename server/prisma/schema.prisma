@@ -65,6 +65,32 @@ enum MessageStatus {
   FAILED
 }
 
+enum CampaignStatus {
+  ACTIVE
+  COMPLETED
+  ARCHIVED
+}
+
+enum CampaignCategory {
+  BUILDING_PROJECT
+  ANNUAL_HARVEST
+  CONVENTION_FUND
+  MISSION_OUTREACH
+  SPECIAL_SEED
+}
+
+enum PledgeStatus {
+  PENDING
+  PARTIALLY_PAID
+  FULFILLED
+  CANCELLED
+}
+
+enum CelebrationType {
+  BIRTHDAY
+  ANNIVERSARY
+}
+
 model Member {
   id                    String              @id @default(uuid())
   memberCode            String?             @unique
@@ -79,6 +105,7 @@ model Member {
   role                  String              @default("Member") // Member, Deacon, Deaconess, Usher, Elder, Pastor, etc.
   status                MemberStatus        @default(ACTIVE)
   dateOfBirth           DateTime?
+  weddingAnniversary    DateTime?
   hometown              String?
   address               String?
   occupation            String?
@@ -92,9 +119,11 @@ model Member {
   createdAt             DateTime            @default(now())
   updatedAt             DateTime            @updatedAt
 
-  departments   MemberDepartment[]
-  attendance    AttendanceRecord[]
-  contributions FinancialContribution[]
+  departments      MemberDepartment[]
+  attendance       AttendanceRecord[]
+  contributions    FinancialContribution[]
+  pledges          MemberPledge[]
+  celebrationLogs  CelebrationLog[]
 
   @@map("members")
 }
@@ -179,4 +208,73 @@ model MessageLog {
   sentAt         DateTime       @default(now())
 
   @@map("message_logs")
+}
+
+model PledgeCampaign {
+  id           String           @id @default(uuid())
+  title        String
+  description  String?          @db.Text
+  targetAmount Decimal          @db.Decimal(12, 2)
+  category     CampaignCategory @default(BUILDING_PROJECT)
+  status       CampaignStatus   @default(ACTIVE)
+  startDate    DateTime         @default(now())
+  endDate      DateTime?
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+
+  pledges      MemberPledge[]
+
+  @@map("pledge_campaigns")
+}
+
+model MemberPledge {
+  id            String         @id @default(uuid())
+  campaignId    String
+  memberId      String?
+  donorName     String?
+  donorPhone    String?
+  pledgedAmount Decimal        @db.Decimal(10, 2)
+  amountPaid    Decimal        @default(0.00) @db.Decimal(10, 2)
+  status        PledgeStatus   @default(PENDING)
+  dueDate       DateTime?
+  notes         String?        @db.Text
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+
+  campaign      PledgeCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  member        Member?        @relation(fields: [memberId], references: [id], onDelete: SetNull)
+  payments      PledgePayment[]
+
+  @@map("member_pledges")
+}
+
+model PledgePayment {
+  id              String        @id @default(uuid())
+  pledgeId        String
+  amount          Decimal       @db.Decimal(10, 2)
+  paymentMethod   PaymentMethod @default(CASH)
+  transactionDate DateTime      @default(now())
+  receiptNumber   String?
+  notes           String?       @db.Text
+  createdAt       DateTime      @default(now())
+
+  pledge          MemberPledge  @relation(fields: [pledgeId], references: [id], onDelete: Cascade)
+
+  @@map("pledge_payments")
+}
+
+model CelebrationLog {
+  id              String          @id @default(uuid())
+  memberId        String
+  celebrationType CelebrationType @default(BIRTHDAY)
+  eventDate       String          // Format: "YYYY-MM-DD"
+  recipientPhone  String
+  messageContent  String          @db.Text
+  status          MessageStatus   @default(SENT)
+  sentAt          DateTime        @default(now())
+
+  member          Member          @relation(fields: [memberId], references: [id], onDelete: Cascade)
+
+  @@unique([memberId, celebrationType, eventDate])
+  @@map("celebration_logs")
 }

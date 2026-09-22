@@ -8,7 +8,11 @@ import {
   AnalyticsData,
   FinancialContribution,
   FinancialSummary,
-  MessageLog
+  MessageLog,
+  Celebrant,
+  PledgeCampaign,
+  MemberPledge,
+  PledgePayment
 } from '../types/index.ts';
 
 const BASE_URL = '/api';
@@ -252,6 +256,109 @@ export const api = {
       body: JSON.stringify(data)
     });
     if (!res.ok) throw new Error('Failed to send message');
+    return res.json();
+  },
+
+  // Celebrations & Automated SMS
+  async getTodayCelebrants(): Promise<Celebrant[]> {
+    const res = await fetch(`${BASE_URL}/celebrations/today`);
+    if (!res.ok) throw new Error('Failed to fetch today celebrants');
+    return res.json();
+  },
+
+  async getUpcomingCelebrants(days = 7): Promise<Celebrant[]> {
+    const res = await fetch(`${BASE_URL}/celebrations/upcoming?days=${days}`);
+    if (!res.ok) throw new Error('Failed to fetch upcoming celebrants');
+    return res.json();
+  },
+
+  async dispatchCelebrationBlessings(data: {
+    memberIds?: string[];
+    customBirthdayTemplate?: string;
+    customAnniversaryTemplate?: string;
+    senderId?: string;
+  }): Promise<{ success: boolean; message: string; result: any }> {
+    const res = await fetch(`${BASE_URL}/celebrations/dispatch`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    });
+    if (!res.ok) throw new Error('Failed to dispatch celebration blessings');
+    return res.json();
+  },
+
+  // Campaigns & Pledges
+  async getCampaigns(): Promise<PledgeCampaign[]> {
+    const res = await fetch(`${BASE_URL}/campaigns`);
+    if (!res.ok) throw new Error('Failed to fetch campaigns');
+    return res.json();
+  },
+
+  async getCampaign(id: string): Promise<PledgeCampaign> {
+    const res = await fetch(`${BASE_URL}/campaigns/${id}`);
+    if (!res.ok) throw new Error('Failed to fetch campaign details');
+    return res.json();
+  },
+
+  async createCampaign(data: {
+    title: string;
+    description?: string;
+    targetAmount: number;
+    category?: string;
+    startDate?: string;
+    endDate?: string;
+  }): Promise<PledgeCampaign> {
+    const res = await fetch(`${BASE_URL}/campaigns`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    });
+    if (!res.ok) throw new Error('Failed to create campaign');
+    return res.json();
+  },
+
+  async createPledge(campaignId: string, data: {
+    memberId?: string;
+    donorName?: string;
+    donorPhone?: string;
+    pledgedAmount: number;
+    dueDate?: string;
+    notes?: string;
+  }): Promise<MemberPledge> {
+    const res = await fetch(`${BASE_URL}/campaigns/${campaignId}/pledges`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    });
+    if (!res.ok) throw new Error('Failed to record pledge');
+    return res.json();
+  },
+
+  async recordPledgePayment(pledgeId: string, data: {
+    amount: number;
+    paymentMethod?: string;
+    notes?: string;
+    transactionDate?: string;
+  }): Promise<{ success: boolean; payment: PledgePayment; updatedPledge: MemberPledge; receiptNumber: string }> {
+    const res = await fetch(`${BASE_URL}/campaigns/pledges/${pledgeId}/payments`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    });
+    if (!res.ok) throw new Error('Failed to record pledge payment');
+    return res.json();
+  },
+
+  async sendPledgeReminders(campaignId: string, data: {
+    customMessage?: string;
+    senderId?: string;
+  }): Promise<{ success: boolean; remindedCount: number; message: string; results: any[] }> {
+    const res = await fetch(`${BASE_URL}/campaigns/${campaignId}/remind-sms`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    });
+    if (!res.ok) throw new Error('Failed to dispatch pledge reminders');
     return res.json();
   },
 

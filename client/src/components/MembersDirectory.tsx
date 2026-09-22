@@ -57,6 +57,7 @@ export const MembersDirectory: React.FC<MembersDirectoryProps> = ({
   const [role, setRole] = useState('Member');
   const [status, setStatus] = useState<MemberStatus>('ACTIVE');
   const [dateOfBirth, setDateOfBirth] = useState('');
+  const [weddingAnniversary, setWeddingAnniversary] = useState('');
   const [hometown, setHometown] = useState('');
   const [address, setAddress] = useState('');
   const [occupation, setOccupation] = useState('');
@@ -78,6 +79,7 @@ export const MembersDirectory: React.FC<MembersDirectoryProps> = ({
     setRole('Member');
     setStatus('ACTIVE');
     setDateOfBirth('');
+    setWeddingAnniversary('');
     setHometown('');
     setAddress('');
     setOccupation('');
@@ -101,6 +103,7 @@ export const MembersDirectory: React.FC<MembersDirectoryProps> = ({
     setRole(member.role);
     setStatus(member.status);
     setDateOfBirth(member.dateOfBirth ? new Date(member.dateOfBirth).toISOString().split('T')[0] : '');
+    setWeddingAnniversary(member.weddingAnniversary ? new Date(member.weddingAnniversary).toISOString().split('T')[0] : '');
     setHometown(member.hometown || '');
     setAddress(member.address || '');
     setOccupation(member.occupation || '');
@@ -127,6 +130,7 @@ export const MembersDirectory: React.FC<MembersDirectoryProps> = ({
       role,
       status,
       dateOfBirth: dateOfBirth || null,
+      weddingAnniversary: weddingAnniversary || null,
       hometown: hometown.trim() || null,
       address: address.trim() || null,
       occupation: occupation.trim() || null,
@@ -156,6 +160,7 @@ export const MembersDirectory: React.FC<MembersDirectoryProps> = ({
       role,
       status,
       dateOfBirth: dateOfBirth || null,
+      weddingAnniversary: weddingAnniversary || null,
       hometown: hometown.trim() || null,
       address: address.trim() || null,
       occupation: occupation.trim() || null,
@@ -558,6 +563,21 @@ export const MembersDirectory: React.FC<MembersDirectoryProps> = ({
 
                     <div className="p-3 bg-slate-50 rounded-xl border border-slate-100">
                       <span className="text-slate-400 font-bold block text-[10px] uppercase">
+                        Wedding Anniversary
+                      </span>
+                      <span className="font-semibold text-purple-900 mt-0.5 block">
+                        {selectedMember.weddingAnniversary
+                          ? new Date(selectedMember.weddingAnniversary).toLocaleDateString(undefined, {
+                              year: 'numeric',
+                              month: 'short',
+                              day: 'numeric'
+                            })
+                          : 'Not set'}
+                      </span>
+                    </div>
+
+                    <div className="p-3 bg-slate-50 rounded-xl border border-slate-100">
+                      <span className="text-slate-400 font-bold block text-[10px] uppercase">
                         Home Town
                       </span>
                       <span className="font-semibold text-slate-900 mt-0.5 block truncate">
@@ -779,13 +799,23 @@ export const MembersDirectory: React.FC<MembersDirectoryProps> = ({
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-3 gap-3">
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                     <div>
                       <label className="block text-xs font-bold text-slate-700 mb-1">DOB</label>
                       <input
                         type="date"
                         value={dateOfBirth}
                         onChange={(e) => setDateOfBirth(e.target.value)}
+                        className="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs font-medium"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 mb-1">Wedding Anniv.</label>
+                      <input
+                        type="date"
+                        value={weddingAnniversary}
+                        onChange={(e) => setWeddingAnniversary(e.target.value)}
                         className="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs font-medium"
                       />
                     </div>
@@ -1028,14 +1058,24 @@ export const MembersDirectory: React.FC<MembersDirectoryProps> = ({
                 </div>
               </div>
 
-              {/* DOB, Hometown, Occupation */}
-              <div className="grid grid-cols-3 gap-3">
+              {/* DOB, Wedding Anniversary, Hometown, Occupation */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                 <div>
                   <label className="block text-xs font-bold text-slate-700 mb-1">Date of Birth</label>
                   <input
                     type="date"
                     value={dateOfBirth}
                     onChange={(e) => setDateOfBirth(e.target.value)}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs font-medium focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">Wedding Anniv.</label>
+                  <input
+                    type="date"
+                    value={weddingAnniversary}
+                    onChange={(e) => setWeddingAnniversary(e.target.value)}
                     className="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs font-medium focus:ring-2 focus:ring-blue-500 focus:outline-none"
                   />
                 </div>

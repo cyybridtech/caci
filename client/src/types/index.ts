@@ -17,6 +17,11 @@ export type MessageStatus = 'SENT' | 'PENDING' | 'FAILED';
 
 export type AssimilationStage = 'FIRST_VISIT' | 'WELCOME_CALL' | 'HOME_VISIT' | 'ASSIGNED_GROUP' | 'REGULAR_MEMBER';
 
+export type CampaignStatus = 'ACTIVE' | 'COMPLETED' | 'ARCHIVED';
+export type CampaignCategory = 'BUILDING_PROJECT' | 'ANNUAL_HARVEST' | 'CONVENTION_FUND' | 'MISSION_OUTREACH' | 'SPECIAL_SEED';
+export type PledgeStatus = 'PENDING' | 'PARTIALLY_PAID' | 'FULFILLED' | 'CANCELLED';
+export type CelebrationType = 'BIRTHDAY' | 'ANNIVERSARY';
+
 export interface Department {
   id: string;
   name: string;
@@ -45,6 +50,7 @@ export interface Member {
   assimilationStage?: AssimilationStage | null;
   invitedBy?: string | null;
   dateOfBirth?: string | null;
+  weddingAnniversary?: string | null;
   hometown?: string | null;
   address: string | null;
   occupation?: string | null;
@@ -231,4 +237,67 @@ export interface MessageLog {
   category: string | null;
   status: MessageStatus;
   sentAt: string;
+}
+
+export interface Celebrant {
+  memberId: string;
+  firstName: string;
+  lastName: string;
+  phone: string | null;
+  photoUrl: string | null;
+  churchGroup: ChurchGroup;
+  celebrationType: CelebrationType;
+  date: string;
+  ageOrYears: number | null;
+  alreadyDispatched: boolean;
+}
+
+export interface PledgePayment {
+  id: string;
+  pledgeId: string;
+  amount: number;
+  paymentMethod: PaymentMethod;
+  transactionDate: string;
+  receiptNumber?: string | null;
+  notes?: string | null;
+  createdAt: string;
+}
+
+export interface MemberPledge {
+  id: string;
+  campaignId: string;
+  memberId: string | null;
+  donorName: string;
+  donorPhone: string | null;
+  pledgedAmount: number;
+  amountPaid: number;
+  status: PledgeStatus;
+  dueDate: string | null;
+  notes: string | null;
+  createdAt: string;
+  updatedAt: string;
+  member?: Member | null;
+  payments?: PledgePayment[];
+}
+
+export interface PledgeCampaign {
+  id: string;
+  title: string;
+  description: string | null;
+  targetAmount: number;
+  category: CampaignCategory;
+  status: CampaignStatus;
+  startDate: string;
+  endDate: string | null;
+  createdAt: string;
+  totalPledged: number;
+  totalPaid: number;
+  remainingTarget: number;
+  percentRaised: number;
+  percentPledged: number;
+  pledgesCount: number;
+  fulfilledCount: number;
+  pendingCount: number;
+  partialCount: number;
+  pledges?: MemberPledge[];
 }

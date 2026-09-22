@@ -8,6 +8,9 @@ import { attendanceRouter } from './routes/attendanceRoutes.js';
 import { financeRouter } from './routes/financeRoutes.js';
 import { messageRouter } from './routes/messageRoutes.js';
 import { syncRouter } from './routes/syncRoutes.js';
+import { celebrationRouter } from './routes/celebrationRoutes.js';
+import { campaignRouter } from './routes/campaignRoutes.js';
+import { dispatchCelebrationBlessings } from './services/celebrationService.js';
 
 dotenv.config();
 
@@ -30,6 +33,29 @@ app.use('/api/attendance', attendanceRouter);
 app.use('/api/finances', financeRouter);
 app.use('/api/messages', messageRouter);
 app.use('/api/sync', syncRouter);
+app.use('/api/celebrations', celebrationRouter);
+app.use('/api/campaigns', campaignRouter);
+
+// Automated Daily Celebration Dispatcher (Runs every morning)
+const AUTO_DISPATCH_HOUR = 7; // 7:00 AM
+let lastAutoRunDay = -1;
+
+setInterval(async () => {
+  const now = new Date();
+  const currentDay = now.getDate();
+  const currentHour = now.getHours();
+
+  if (currentHour >= AUTO_DISPATCH_HOUR && lastAutoRunDay !== currentDay) {
+    lastAutoRunDay = currentDay;
+    console.log(`[Celebration Engine] Running daily automated Birthday & Anniversary check for ${now.toDateString()}...`);
+    try {
+      const res = await dispatchCelebrationBlessings({});
+      console.log(`[Celebration Engine] Dispatched blessings to ${res.dispatchedCount} celebrants.`);
+    } catch (err: any) {
+      console.error('[Celebration Engine] Error in automated celebration dispatch:', err.message);
+    }
+  }
+}, 60 * 1000); // Check every minute
 
 app.listen(PORT, () => {
   console.log(`=============================================`);

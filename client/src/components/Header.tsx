@@ -16,7 +16,9 @@ import {
   Search,
   History,
   HelpCircle,
-  X
+  X,
+  Cake,
+  Building
 } from 'lucide-react';
 import { ServiceSession } from '../types/index.ts';
 
@@ -29,6 +31,8 @@ interface HeaderProps {
     | 'pipeline'
     | 'departments'
     | 'finances'
+    | 'campaigns'
+    | 'celebrations'
     | 'messaging';
   setActiveTab: (tab: any) => void;
   activeSession: ServiceSession | null;
@@ -40,6 +44,7 @@ interface HeaderProps {
   offlineQueueCount: number;
   onSync: () => void;
   isSyncing: boolean;
+  todayCelebrantsCount?: number;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -53,7 +58,8 @@ export const Header: React.FC<HeaderProps> = ({
   isOnline,
   offlineQueueCount,
   onSync,
-  isSyncing
+  isSyncing,
+  todayCelebrantsCount
 }) => {
   const [showSessionModal, setShowSessionModal] = useState(false);
   const [showHotkeysModal, setShowHotkeysModal] = useState(false);
@@ -262,6 +268,33 @@ export const Header: React.FC<HeaderProps> = ({
         >
           <DollarSign className="w-4 h-4" />
           <span>Finances (GH₵)</span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab('campaigns')}
+          className={`flex items-center space-x-2 px-3.5 py-2 text-xs font-bold rounded-t-xl transition border-b-2 whitespace-nowrap ${
+            activeTab === 'campaigns'
+              ? 'border-indigo-500 text-indigo-400 bg-slate-800/80 shadow-sm'
+              : 'border-transparent text-slate-400 hover:text-slate-200 hover:bg-slate-800/40'
+          }`}
+        >
+          <Building className="w-4 h-4" />
+          <span>Pledges & Harvest</span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab('celebrations')}
+          className={`flex items-center space-x-2 px-3.5 py-2 text-xs font-bold rounded-t-xl transition border-b-2 whitespace-nowrap relative ${
+            activeTab === 'celebrations'
+              ? 'border-rose-500 text-rose-400 bg-slate-800/80 shadow-sm'
+              : 'border-transparent text-slate-400 hover:text-slate-200 hover:bg-slate-800/40'
+          }`}
+        >
+          <Cake className="w-4 h-4" />
+          <span>Celebrations</span>
+          {typeof todayCelebrantsCount === 'number' && todayCelebrantsCount > 0 && (
+            <span className="w-2 h-2 rounded-full bg-rose-500 animate-pulse"></span>
+          )}
         </button>
 
         <button
