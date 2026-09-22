@@ -1,0 +1,182 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+enum ChurchGroup {
+  GROUP_1
+  GROUP_2
+}
+
+enum MemberStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum Gender {
+  MALE
+  FEMALE
+  OTHER
+}
+
+enum MaritalStatus {
+  SINGLE
+  MARRIED
+  WIDOWED
+  DIVORCED
+}
+
+enum AssimilationStage {
+  REGULAR_MEMBER
+  FIRST_VISIT
+  WELCOME_CALL
+  HOME_VISIT
+  ASSIGNED_GROUP
+}
+
+enum FinancialCategory {
+  TITHE
+  OFFERING
+  WELFARE
+  THANKSGIVING
+  BUILDING_PROJECT
+  SPECIAL_SEED
+}
+
+enum PaymentMethod {
+  CASH
+  MOBILE_MONEY
+  BANK_TRANSFER
+  CHEQUE
+}
+
+enum MessageChannel {
+  SMS
+  WHATSAPP
+}
+
+enum MessageStatus {
+  SENT
+  PENDING
+  FAILED
+}
+
+model Member {
+  id                    String              @id @default(uuid())
+  memberCode            String?             @unique
+  photoUrl              String?             @db.MediumText
+  firstName             String
+  lastName              String
+  phone                 String?
+  email                 String?
+  gender                Gender              @default(MALE)
+  maritalStatus         MaritalStatus       @default(SINGLE)
+  churchGroup           ChurchGroup         @default(GROUP_1)
+  role                  String              @default("Member") // Member, Deacon, Deaconess, Usher, Elder, Pastor, etc.
+  status                MemberStatus        @default(ACTIVE)
+  dateOfBirth           DateTime?
+  hometown              String?
+  address               String?
+  occupation            String?
+  emergencyContactName  String?
+  emergencyContactPhone String?
+  isWaterBaptized       Boolean             @default(false)
+  isHolyGhostBaptized   Boolean             @default(false)
+  assimilationStage     AssimilationStage   @default(REGULAR_MEMBER)
+  invitedBy             String?
+  notes                 String?             @db.Text
+  createdAt             DateTime            @default(now())
+  updatedAt             DateTime            @updatedAt
+
+  departments   MemberDepartment[]
+  attendance    AttendanceRecord[]
+  contributions FinancialContribution[]
+
+  @@map("members")
+}
+
+model Department {
+  id          String             @id @default(uuid())
+  name        String             @unique
+  description String?            @db.Text
+  leaderName  String?
+  createdAt   DateTime           @default(now())
+
+  members     MemberDepartment[]
+
+  @@map("departments")
+}
+
+model MemberDepartment {
+  memberId     String
+  departmentId String
+  joinedAt     DateTime   @default(now())
+
+  member       Member     @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  department   Department @relation(fields: [departmentId], references: [id], onDelete: Cascade)
+
+  @@id([memberId, departmentId])
+  @@map("member_departments")
+}
+
+model ServiceSession {
+  id          String                 @id @default(uuid())
+  serviceDate DateTime
+  serviceType String                 // "Sunday Divine Worship Service", "Midweek Teaching & Prayer Service", "Friday Prayer Night", "Special Convention Service"
+  theme       String?
+  notes       String?                @db.Text
+  createdAt   DateTime               @default(now())
+
+  attendance    AttendanceRecord[]
+  contributions FinancialContribution[]
+
+  @@map("service_sessions")
+}
+
+model AttendanceRecord {
+  id          String         @id @default(uuid())
+  sessionId   String
+  memberId    String
+  checkInTime DateTime       @default(now())
+  markedBy    String         @default("Media Desk")
+
+  session     ServiceSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  member      Member         @relation(fields: [memberId], references: [id], onDelete: Cascade)
+
+  @@unique([sessionId, memberId])
+  @@map("attendance_records")
+}
+
+model FinancialContribution {
+  id              String            @id @default(uuid())
+  memberId        String?
+  sessionId       String?
+  category        FinancialCategory @default(OFFERING)
+  amount          Decimal           @db.Decimal(10, 2)
+  paymentMethod   PaymentMethod     @default(CASH)
+  transactionDate DateTime          @default(now())
+  notes           String?           @db.Text
+  createdAt       DateTime          @default(now())
+
+  member          Member?           @relation(fields: [memberId], references: [id], onDelete: SetNull)
+  session         ServiceSession?   @relation(fields: [sessionId], references: [id], onDelete: SetNull)
+
+  @@map("financial_contributions")
+}
+
+model MessageLog {
+  id             String         @id @default(uuid())
+  channel        MessageChannel @default(SMS)
+  recipientPhone String
+  recipientName  String?
+  messageContent String         @db.Text
+  category       String?
+  status         MessageStatus  @default(SENT)
+  sentAt         DateTime       @default(now())
+
+  @@map("message_logs")
+}

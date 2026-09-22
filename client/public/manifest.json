@@ -1,0 +1,16 @@
+{
+  "short_name": "CACI Manager",
+  "name": "CACI Church Management & Attendance System",
+  "icons": [
+    {
+      "src": "/church-logo.svg",
+      "type": "image/svg+xml",
+      "sizes": "192x192 512x512"
+    }
+  ],
+  "start_url": "/",
+  "background_color": "#1e3a8a",
+  "theme_color": "#1e3a8a",
+  "display": "standalone",
+  "orientation": "portrait-primary"
+}

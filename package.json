@@ -1,0 +1,13 @@
+{
+  "name": "caci-church-management-system",
+  "version": "1.0.0",
+  "description": "Church Attendance & Management System for CACI",
+  "scripts": {
+    "dev": "concurrently \"npm run dev --prefix server\" \"npm run dev --prefix client\"",
+    "build": "npm run build --prefix server && npm run build --prefix client",
+    "install-all": "npm install && npm install --prefix server && npm install --prefix client"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.0"
+  }
+}
