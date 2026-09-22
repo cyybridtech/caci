@@ -74,7 +74,8 @@ messageRouter.post('/broadcast', async (req: Request, res: Response) => {
       departmentId,
       channel, // 'SMS' | 'WHATSAPP'
       template,
-      customMessage
+      customMessage,
+      senderId
     } = req.body;
 
     let recipients: { id: string; firstName: string; lastName: string; phone: string | null; churchGroup: ChurchGroup }[] = [];
@@ -191,7 +192,8 @@ messageRouter.post('/broadcast', async (req: Request, res: Response) => {
     if (channel === 'SMS' && smsPhones.length > 0) {
       gatewayResult = await sendVynfySMS({
         recipients: smsPhones,
-        message: defaultMsg.replace(/{firstName}/g, 'Beloved').replace(/{lastName}/g, '').replace(/{group}/g, 'CACI')
+        message: defaultMsg.replace(/{firstName}/g, 'Beloved').replace(/{lastName}/g, '').replace(/{group}/g, 'CACI'),
+        senderId: senderId || undefined
       });
     }
 

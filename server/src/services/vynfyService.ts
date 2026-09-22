@@ -35,7 +35,7 @@ export function formatGhanaPhoneNumber(phone: string): string {
 }
 
 /**
- * Dispatch SMS via Vynfy / SMS Gateway
+ * Dispatch SMS via official Vynfy SMS Gateway (https://sms.vynfy.com/api/v1/send)
  */
 export async function sendVynfySMS(options: VynfySendOptions): Promise<VynfySendResult> {
   const formattedRecipients = options.recipients
@@ -54,86 +54,58 @@ export async function sendVynfySMS(options: VynfySendOptions): Promise<VynfySend
   const sender = options.senderId || DEFAULT_SENDER_ID;
   const message = options.message;
 
-  // Try Vynfy API endpoints
-  const endpoints = [
-    {
-      url: 'https://api.vynfy.com/v1/sms/send',
-      payload: {
-        key: VYNFY_API_KEY,
-        api_key: VYNFY_API_KEY,
-        sender: sender,
-        recipient: formattedRecipients,
-        message: message
-      },
-      headers: {
-        'Authorization': `Bearer ${VYNFY_API_KEY}`,
-        'Content-Type': 'application/json'
-      }
-    },
-    {
-      url: 'https://vynfy.com/api/v1/sms',
-      payload: {
-        api_key: VYNFY_API_KEY,
-        sender_id: sender,
-        recipients: formattedRecipients,
-        message: message
-      },
-      headers: {
-        'api-key': VYNFY_API_KEY,
-        'Content-Type': 'application/json'
-      }
-    },
-    {
-      url: 'https://apps.mnotify.net/smsapi',
-      payload: {
-        key: VYNFY_API_KEY,
-        to: formattedRecipients.join(','),
-        msg: message,
-        sender_id: sender
-      },
-      headers: {
-        'Content-Type': 'application/json'
-      }
-    }
-  ];
+  try {
+    const payload = {
+      sender: sender,
+      recipients: formattedRecipients,
+      message: message
+    };
 
-  let lastError: any = null;
+    console.log(`[Vynfy SMS] Initiating dispatch to ${formattedRecipients.length} recipients via https://sms.vynfy.com/api/v1/send with sender ID "${sender}"`);
 
-  for (const ep of endpoints) {
+    const response = await fetch('https://sms.vynfy.com/api/v1/send', {
+      method: 'POST',
+      headers: {
+        'X-API-Key': VYNFY_API_KEY,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(payload)
+    });
+
+    const responseText = await response.text();
+    let responseData: any = {};
     try {
-      const response = await fetch(ep.url, {
-        method: 'POST',
-        headers: ep.headers,
-        body: JSON.stringify(ep.payload)
-      });
-
-      if (response.ok) {
-        const data = await response.json().catch(() => ({}));
-        console.log(`[Vynfy SMS] Successfully sent via ${ep.url}:`, data);
-        return {
-          success: true,
-          status: 'DELIVERED',
-          recipientCount: formattedRecipients.length,
-          rawResponse: data
-        };
-      } else {
-        const errData = await response.text().catch(() => '');
-        lastError = errData;
-        console.warn(`[Vynfy SMS] Attempt on ${ep.url} returned status ${response.status}:`, errData);
-      }
-    } catch (err: any) {
-      lastError = err.message;
-      console.warn(`[Vynfy SMS] Attempt on ${ep.url} failed:`, err.message);
+      responseData = JSON.parse(responseText);
+    } catch {
+      responseData = { message: responseText };
     }
-  }
 
-  // Gateway log and smooth dispatch handling
-  console.log(`[Vynfy SMS Gateway] Dispatched to ${formattedRecipients.length} recipients (API Key: ${VYNFY_API_KEY.substring(0, 6)}***)`);
-  
-  return {
-    success: true,
-    status: 'SENT',
-    recipientCount: formattedRecipients.length,
-    rawResponse: { note: 'Dispatched via Vynfy gateway queue', lastGatewayAttempt: lastError }
-  };
+    if (response.ok) {
+      console.log(`[Vynfy SMS] Successfully sent via Vynfy:`, responseData);
+      return {
+        success: true,
+        messageId: responseData.task_id || responseData.id || responseData.messageId || 'vynfy-' + Date.now(),
+        status: 'DELIVERED',
+        recipientCount: formattedRecipients.length,
+        rawResponse: responseData
+      };
+    } else {
+      console.warn(`[Vynfy SMS Gateway] Gateway returned status ${response.status}:`, responseData);
+      return {
+        success: false,
+        status: response.status === 403 ? 'SENDER_ID_APPROVAL_REQUIRED' : 'GATEWAY_ERROR',
+        recipientCount: formattedRecipients.length,
+        error: responseData.message || `Vynfy Gateway Error (${response.status})`,
+        rawResponse: responseData
+      };
+    }
+  } catch (err: any) {
+    console.error(`[Vynfy SMS] Network/Server exception:`, err.message);
+    return {
+      success: false,
+      status: 'NETWORK_ERROR',
+      recipientCount: formattedRecipients.length,
+      error: err.message
+    };
+  }
 }

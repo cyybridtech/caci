@@ -33,7 +33,8 @@ interface MessagingViewProps {
     departmentId?: string;
     channel: 'SMS' | 'WHATSAPP';
     customMessage?: string;
-  }) => Promise<{ success: boolean; sentCount: number; whatsappLinks?: { name: string; phone: string; url: string }[]; message: string }>;
+    senderId?: string;
+  }) => Promise<{ success: boolean; sentCount: number; whatsappLinks?: { name: string; phone: string; url: string }[]; message: string; gateway?: any }>;
   initialTarget?: string;
   initialDeptId?: string;
 }
@@ -51,10 +52,17 @@ export const MessagingView: React.FC<MessagingViewProps> = ({
   const [targetType, setTargetType] = useState<string>(initialTarget);
   const [selectedDeptId, setSelectedDeptId] = useState<string>(initialDeptId || departments[0]?.id || '');
   const [channel, setChannel] = useState<'SMS' | 'WHATSAPP'>('SMS');
+  const [senderId, setSenderId] = useState<string>('CACI');
   const [customMessage, setCustomMessage] = useState<string>('');
   const [isSending, setIsSending] = useState(false);
   const [feedback, setFeedback] = useState<string | null>(null);
+  const [gatewayResult, setGatewayResult] = useState<any>(null);
   const [whatsappLinks, setWhatsappLinks] = useState<{ name: string; phone: string; url: string }[]>([]);
+
+  // Test single number SMS
+  const [testPhone, setTestPhone] = useState('');
+  const [isTestingSingle, setIsTestingSingle] = useState(false);
+  const [testResult, setTestResult] = useState<any>(null);
 
   // Specific member selection state
   const [selectedMemberIds, setSelectedMemberIds] = useState<string[]>([]);
@@ -121,6 +129,7 @@ export const MessagingView: React.FC<MessagingViewProps> = ({
     try {
       setIsSending(true);
       setFeedback(null);
+      setGatewayResult(null);
       setWhatsappLinks([]);
 
       const res = await onBroadcast({
@@ -129,10 +138,14 @@ export const MessagingView: React.FC<MessagingViewProps> = ({
         sessionId: session?.id,
         departmentId: targetType === 'DEPARTMENT' ? selectedDeptId : undefined,
         channel,
+        senderId: senderId.trim() || undefined,
         customMessage: customMessage.trim() || undefined
       });
 
-      setFeedback(`Sent to ${res.sentCount} member(s) successfully!`);
+      setFeedback(`Dispatched to ${res.sentCount} member(s) successfully.`);
+      if (res.gateway) {
+        setGatewayResult(res.gateway);
+      }
       if (res.whatsappLinks && res.whatsappLinks.length > 0) {
         setWhatsappLinks(res.whatsappLinks);
       }
@@ -140,6 +153,36 @@ export const MessagingView: React.FC<MessagingViewProps> = ({
       setFeedback(err.message || 'Failed to dispatch messages');
     } finally {
       setIsSending(false);
+    }
+  };
+
+  const handleTestSingleSMS = async () => {
+    if (!testPhone.trim()) {
+      alert('Please enter a phone number to test (e.g. 024XXXXXXX or 233XXXXXXXXX)');
+      return;
+    }
+
+    try {
+      setIsTestingSingle(true);
+      setTestResult(null);
+      const res = await fetch('http://localhost:5000/api/messages/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          channel: 'SMS',
+          recipientPhone: testPhone.trim(),
+          recipientName: 'Test Recipient',
+          messageContent: customMessage.trim() || 'Test message from CACI Church Management System via Vynfy.',
+          category: 'TEST_SMS',
+          senderId: senderId.trim() || undefined
+        })
+      });
+      const data = await res.json();
+      setTestResult(data);
+    } catch (err: any) {
+      setTestResult({ success: false, error: err.message });
+    } finally {
+      setIsTestingSingle(false);
     }
   };
 
@@ -522,6 +565,27 @@ export const MessagingView: React.FC<MessagingViewProps> = ({
                     </span>
                   </button>
                 </div>
+
+                {channel === 'SMS' && (
+                  <div className="mt-3 p-3.5 rounded-2xl bg-blue-50/60 border border-blue-200/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div>
+                      <span className="text-xs font-bold text-blue-950 block">SMS Sender ID</span>
+                      <span className="text-[11px] text-slate-500">
+                        Must match an approved Sender ID name registered in your Vynfy portal
+                      </span>
+                    </div>
+                    <div className="w-full sm:w-48">
+                      <input
+                        type="text"
+                        value={senderId}
+                        onChange={(e) => setSenderId(e.target.value.toUpperCase().substring(0, 11))}
+                        placeholder="e.g. CACI"
+                        maxLength={11}
+                        className="w-full px-3 py-1.5 bg-white border border-blue-300 rounded-xl font-bold font-mono text-xs text-blue-900 focus:outline-none focus:ring-2 focus:ring-blue-500 uppercase text-center tracking-wider"
+                      />
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Message Composer & Personalization Tags */}
@@ -590,6 +654,110 @@ export const MessagingView: React.FC<MessagingViewProps> = ({
                 </button>
               </div>
             </form>
+
+            {/* Live Gateway Diagnostics Result */}
+            {gatewayResult && (
+              <div className={`p-4 rounded-2xl border text-xs space-y-2 mt-4 ${
+                gatewayResult.success
+                  ? 'bg-emerald-50 border-emerald-300 text-emerald-950'
+                  : 'bg-amber-50 border-amber-300 text-amber-950'
+              }`}>
+                <div className="flex items-center justify-between font-bold">
+                  <span className="flex items-center space-x-1.5">
+                    {gatewayResult.success ? (
+                      <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                    ) : (
+                      <Info className="w-4 h-4 text-amber-600" />
+                    )}
+                    <span>Vynfy Gateway Status: {gatewayResult.status}</span>
+                  </span>
+                  <span className="font-mono text-[10px] text-slate-500">
+                    Recipients: {gatewayResult.recipientCount}
+                  </span>
+                </div>
+
+                {gatewayResult.error && (
+                  <p className="font-semibold text-amber-900 bg-white/70 p-2.5 rounded-xl border border-amber-200">
+                    {gatewayResult.error}
+                  </p>
+                )}
+
+                {gatewayResult.status === 'SENDER_ID_APPROVAL_REQUIRED' && (
+                  <div className="text-[11px] text-amber-900 space-y-1 bg-amber-100/70 p-2.5 rounded-xl border border-amber-300">
+                    <p className="font-bold">Ghana Telecom / Vynfy Sender ID Notice:</p>
+                    <p>
+                      Vynfy requires your chosen Sender ID (e.g. <strong>"{senderId}"</strong>) to be submitted and approved in your Vynfy portal dashboard under <strong>Sender IDs</strong> before live carrier delivery is permitted. Once approved in Vynfy, messages to your congregants will immediately deliver!
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Quick Single Phone Live Test Tool */}
+          <div className="bg-white p-5 rounded-3xl border border-slate-200 shadow-sm space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-2">
+                <Zap className="w-4 h-4 text-amber-500" />
+                <h4 className="text-xs font-extrabold text-slate-900 uppercase tracking-wider">
+                  Live Single-Number SMS Gateway Tester
+                </h4>
+              </div>
+              <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-slate-100 text-slate-600">
+                Direct Sandbox
+              </span>
+            </div>
+
+            <p className="text-[11px] text-slate-500">
+              Send a test SMS to a specific Ghana phone number right now using your Vynfy API key.
+            </p>
+
+            <div className="flex flex-col sm:flex-row items-center gap-2.5">
+              <div className="relative flex-1 w-full">
+                <Phone className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-3" />
+                <input
+                  type="text"
+                  placeholder="Enter Ghana phone (e.g. 0244123456 or 233244123456)"
+                  value={testPhone}
+                  onChange={(e) => setTestPhone(e.target.value)}
+                  className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+
+              <button
+                type="button"
+                onClick={handleTestSingleSMS}
+                disabled={isTestingSingle}
+                className="w-full sm:w-auto px-5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs shadow-sm transition disabled:opacity-50 flex items-center justify-center space-x-1.5"
+              >
+                {isTestingSingle ? (
+                  <span>Testing Gateway...</span>
+                ) : (
+                  <>
+                    <Send className="w-3.5 h-3.5" />
+                    <span>Send Test SMS</span>
+                  </>
+                )}
+              </button>
+            </div>
+
+            {testResult && (
+              <div className={`p-3 rounded-xl border text-[11px] font-mono space-y-1 ${
+                testResult.gateway?.success
+                  ? 'bg-emerald-50 border-emerald-200 text-emerald-900'
+                  : 'bg-amber-50 border-amber-200 text-amber-900'
+              }`}>
+                <div className="font-bold flex items-center justify-between">
+                  <span>Gateway Response: {testResult.gateway?.status || 'SENT'}</span>
+                  <span>{testResult.gateway?.recipientCount || 1} recipient</span>
+                </div>
+                {testResult.gateway?.error && (
+                  <p className="font-sans font-semibold text-amber-950">
+                    {testResult.gateway.error}
+                  </p>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Generated WhatsApp Direct Links (if WhatsApp selected) */}

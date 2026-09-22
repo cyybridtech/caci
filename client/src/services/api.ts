@@ -224,7 +224,8 @@ export const api = {
     departmentId?: string;
     channel: 'SMS' | 'WHATSAPP';
     customMessage?: string;
-  }): Promise<{ success: boolean; sentCount: number; whatsappLinks?: { name: string; phone: string; url: string }[]; message: string }> {
+    senderId?: string;
+  }): Promise<{ success: boolean; sentCount: number; whatsappLinks?: { name: string; phone: string; url: string }[]; message: string; gateway?: any }> {
     const res = await fetch(`${BASE_URL}/messages/broadcast`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -243,7 +244,8 @@ export const api = {
     recipientName?: string;
     messageContent: string;
     category?: string;
-  }): Promise<{ success: boolean; log: MessageLog; whatsappUrl: string }> {
+    senderId?: string;
+  }): Promise<{ success: boolean; log: MessageLog; whatsappUrl: string; gateway?: any }> {
     const res = await fetch(`${BASE_URL}/messages/send`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
