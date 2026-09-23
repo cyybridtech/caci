@@ -105,20 +105,41 @@ memberRouter.get('/', async (req: Request, res: Response) => {
 
     const members = await prisma.member.findMany({
       where: whereClause,
-      include: {
+      select: {
+        id: true,
+        memberCode: true,
+        // photoUrl excluded from list — loads only on individual profile view
+        firstName: true,
+        lastName: true,
+        phone: true,
+        email: true,
+        gender: true,
+        maritalStatus: true,
+        churchGroup: true,
+        role: true,
+        status: true,
+        dateOfBirth: true,
+        weddingAnniversary: true,
+        hometown: true,
+        address: true,
+        occupation: true,
+        emergencyContactName: true,
+        emergencyContactPhone: true,
+        isWaterBaptized: true,
+        isHolyGhostBaptized: true,
+        assimilationStage: true,
+        invitedBy: true,
+        notes: true,
+        createdAt: true,
+        updatedAt: true,
         _count: {
-          select: {
-            attendance: true,
-            contributions: true
-          }
+          select: { attendance: true, contributions: true }
         }
       },
-      orderBy: [
-        { lastName: 'asc' },
-        { firstName: 'asc' }
-      ]
+      orderBy: [{ lastName: 'asc' }, { firstName: 'asc' }]
     });
 
+    res.setHeader('Cache-Control', 'private, max-age=30');
     res.json(members);
   } catch (error: any) {
     console.error('Error fetching members:', error);

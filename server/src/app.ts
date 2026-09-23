@@ -1,5 +1,6 @@
 import express, { Request, Response } from 'express';
 import cors from 'cors';
+import compression from 'compression';
 import dotenv from 'dotenv';
 import { memberRouter } from './routes/memberRoutes.js';
 import { departmentRouter } from './routes/departmentRoutes.js';
@@ -14,6 +15,9 @@ import { campaignRouter } from './routes/campaignRoutes.js';
 dotenv.config();
 
 const app = express();
+
+// Gzip compress all responses — reduces payload size ~70%
+app.use(compression());
 
 // Allow requests from any origin (Vercel frontend + local dev)
 app.use(cors({
