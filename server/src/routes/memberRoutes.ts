@@ -209,8 +209,16 @@ memberRouter.post('/', async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'First name and last name are required' });
     }
 
-    const count = await prisma.member.count();
-    const memberCode = `CACI-${String(count + 1).padStart(3, '0')}`;
+    // Use the highest existing code (not count) so deletions/retries never cause P2002 collisions
+    const lastMember = await prisma.member.findFirst({
+      where: { memberCode: { startsWith: 'CACI-' } },
+      orderBy: { memberCode: 'desc' },
+      select: { memberCode: true },
+    });
+    const lastNumber = lastMember?.memberCode
+      ? parseInt(lastMember.memberCode.replace('CACI-', ''), 10)
+      : 0;
+    const memberCode = `CACI-${String((isNaN(lastNumber) ? 0 : lastNumber) + 1).padStart(3, '0')}`;
 
     const newMember = await prisma.member.create({
       data: {
