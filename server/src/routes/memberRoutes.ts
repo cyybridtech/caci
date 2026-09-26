@@ -240,7 +240,12 @@ memberRouter.post('/', async (req: Request, res: Response) => {
     res.status(201).json(newMember);
   } catch (error: any) {
     console.error('Error creating member:', error);
-    res.status(500).json({ error: 'Failed to create member' });
+    res.status(500).json({
+      error: 'Failed to create member',
+      message: error.message,
+      code: error.code,
+      meta: error.meta,
+    });
   }
 });
 
