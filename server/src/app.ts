@@ -1,4 +1,4 @@
-import express, { Request, Response } from 'express';
+import express, { Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import compression from 'compression';
 import dotenv from 'dotenv';
@@ -11,6 +11,7 @@ import { messageRouter } from './routes/messageRoutes.js';
 import { syncRouter } from './routes/syncRoutes.js';
 import { celebrationRouter } from './routes/celebrationRoutes.js';
 import { campaignRouter } from './routes/campaignRoutes.js';
+import { prisma } from './db.js';
 
 dotenv.config();
 
@@ -28,7 +29,7 @@ app.use(cors({
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-// Health check
+// Basic health check
 app.get('/api/health', (_req: Request, res: Response) => {
   res.json({
     status: 'ok',
@@ -36,6 +37,28 @@ app.get('/api/health', (_req: Request, res: Response) => {
     system: 'CACI Church Management System',
     db: process.env.DATABASE_URL ? 'TiDB Cloud connected' : 'No DB URL',
   });
+});
+
+// Deep DB health check — actually pings TiDB and surfaces the real error
+app.get('/api/health/db', async (_req: Request, res: Response) => {
+  try {
+    const memberCount = await prisma.member.count();
+    const deptCount = await prisma.department.count();
+    res.json({
+      status: 'ok',
+      members: memberCount,
+      departments: deptCount,
+      db: 'TiDB query successful',
+    });
+  } catch (err: any) {
+    console.error('[DB Health Check] Error:', err);
+    res.status(500).json({
+      status: 'error',
+      message: err.message,
+      code: err.code,
+      meta: err.meta,
+    });
+  }
 });
 
 // Mount Routes
