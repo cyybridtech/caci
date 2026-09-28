@@ -10,8 +10,17 @@ datasource db {
 }
 
 enum ChurchGroup {
-  GROUP_1
-  GROUP_2
+  JOY
+  FAITH
+  HOPE
+  LOVE
+}
+
+enum UserRole {
+  ADMIN
+  CELL_LEADER
+  MEDIA_TEAM
+  FINANCE
 }
 
 enum MemberStatus {
@@ -103,7 +112,7 @@ model Member {
   email                 String?
   gender                Gender              @default(MALE)
   maritalStatus         MaritalStatus       @default(SINGLE)
-  churchGroup           ChurchGroup         @default(GROUP_1)
+  churchGroup           ChurchGroup         @default(JOY)
   role                  String              @default("Member") // Member, Deacon, Deaconess, Usher, Elder, Pastor, etc.
   status                MemberStatus        @default(ACTIVE)
   dateOfBirth           DateTime?
@@ -279,4 +288,21 @@ model CelebrationLog {
 
   @@unique([memberId, celebrationType, eventDate])
   @@map("celebration_logs")
+}
+
+model User {
+  id                 String       @id @default(uuid())
+  username           String       @unique
+  password           String       // bcrypt hashed
+  role               UserRole
+  cell               ChurchGroup? // only set for CELL_LEADER
+  mustChangePassword Boolean      @default(true)
+  createdById        String?
+  createdAt          DateTime     @default(now())
+  updatedAt          DateTime     @updatedAt
+
+  createdBy          User?        @relation("UserCreatedBy", fields: [createdById], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  createdUsers       User[]       @relation("UserCreatedBy")
+
+  @@map("users")
 }

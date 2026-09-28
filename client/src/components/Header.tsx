@@ -18,9 +18,12 @@ import {
   HelpCircle,
   X,
   Cake,
-  Building
+  Building,
+  Shield,
+  LogOut,
+  User
 } from 'lucide-react';
-import { ServiceSession } from '../types/index.ts';
+import { ServiceSession, AuthUser, ChurchGroup } from '../types/index.ts';
 
 interface HeaderProps {
   activeTab:
@@ -33,7 +36,8 @@ interface HeaderProps {
     | 'finances'
     | 'campaigns'
     | 'celebrations'
-    | 'messaging';
+    | 'messaging'
+    | 'users';
   setActiveTab: (tab: any) => void;
   activeSession: ServiceSession | null;
   sessions: ServiceSession[];
@@ -45,6 +49,8 @@ interface HeaderProps {
   onSync: () => void;
   isSyncing: boolean;
   todayCelebrantsCount?: number;
+  currentUser?: AuthUser | null;
+  onLogout?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -59,7 +65,9 @@ export const Header: React.FC<HeaderProps> = ({
   offlineQueueCount,
   onSync,
   isSyncing,
-  todayCelebrantsCount
+  todayCelebrantsCount,
+  currentUser,
+  onLogout
 }) => {
   const [showSessionModal, setShowSessionModal] = useState(false);
   const [showHotkeysModal, setShowHotkeysModal] = useState(false);
@@ -83,6 +91,36 @@ export const Header: React.FC<HeaderProps> = ({
     ? new Date(activeSession.serviceDate).toISOString().split('T')[0]
     : new Date().toISOString().split('T')[0];
 
+  const getCellLabel = (cell?: ChurchGroup) => {
+    if (!cell) return '';
+    switch (cell) {
+      case 'JOY': return 'Joy Cell';
+      case 'FAITH': return 'Faith Cell';
+      case 'HOPE': return 'Hope Cell';
+      case 'LOVE': return 'Love Cell';
+      default: return cell;
+    }
+  };
+
+  const isRoleAuthorizedForTab = (tab: string) => {
+    if (!currentUser) return true;
+    if (currentUser.role === 'ADMIN') return true;
+
+    if (currentUser.role === 'CELL_LEADER') {
+      return ['checkin', 'members', 'attendance-history', 'pipeline', 'users'].includes(tab);
+    }
+
+    if (currentUser.role === 'MEDIA_TEAM') {
+      return ['checkin', 'attendance-history', 'celebrations', 'messaging'].includes(tab);
+    }
+
+    if (currentUser.role === 'FINANCE') {
+      return ['finances', 'campaigns'].includes(tab);
+    }
+
+    return true;
+  };
+
   return (
     <header className="bg-slate-900 text-white shadow-xl sticky top-0 z-30 border-b border-slate-800">
       {/* Top Bar */}
@@ -96,11 +134,13 @@ export const Header: React.FC<HeaderProps> = ({
             <div className="flex items-center space-x-2">
               <span className="font-extrabold text-lg tracking-tight text-white">CACI</span>
               <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40">
-                Media Desk Kiosk
+                Church Desk
               </span>
-              <span className="hidden sm:inline-block text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-900/60 text-blue-300 border border-blue-500/30">
-                by Cyybrid Technology
-              </span>
+              {currentUser?.cell && (
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-900/60 text-blue-300 border border-blue-500/30">
+                  {getCellLabel(currentUser.cell)}
+                </span>
+              )}
             </div>
             <p className="text-[11px] text-slate-400">Christ Apostolic Church Int. Management System</p>
           </div>
@@ -136,17 +176,43 @@ export const Header: React.FC<HeaderProps> = ({
             </select>
           </div>
 
-          <button
-            onClick={() => setShowSessionModal(true)}
-            title="Create/Add New Service Session"
-            className="p-1 hover:bg-slate-700 rounded-lg text-slate-300 hover:text-white transition"
-          >
-            <Plus className="w-3.5 h-3.5" />
-          </button>
+          {(currentUser?.role === 'ADMIN' || currentUser?.role === 'MEDIA_TEAM') && (
+            <button
+              onClick={() => setShowSessionModal(true)}
+              title="Create/Add New Service Session"
+              className="p-1 hover:bg-slate-700 rounded-lg text-slate-300 hover:text-white transition"
+            >
+              <Plus className="w-3.5 h-3.5" />
+            </button>
+          )}
         </div>
 
-        {/* Right Side: Hotkeys & Offline Status */}
+        {/* Right Side: User Profile, Hotkeys & Offline Status */}
         <div className="flex items-center space-x-2.5">
+          {/* User badge & Logout */}
+          {currentUser && (
+            <div className="flex items-center space-x-2 bg-slate-850 px-2.5 py-1 rounded-xl border border-slate-700/80">
+              <div className="text-right hidden sm:block">
+                <div className="text-xs font-bold text-white flex items-center justify-end space-x-1">
+                  <span>{currentUser.username}</span>
+                </div>
+                <div className="text-[9px] font-bold text-amber-400 uppercase tracking-wider">
+                  {currentUser.role.replace('_', ' ')}
+                </div>
+              </div>
+
+              {onLogout && (
+                <button
+                  onClick={onLogout}
+                  title="Sign Out"
+                  className="p-1.5 rounded-lg hover:bg-red-950/60 text-slate-400 hover:text-red-400 border border-transparent hover:border-red-600/30 transition"
+                >
+                  <LogOut className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
+          )}
+
           {/* Hotkey Helper Button */}
           <button
             onClick={() => setShowHotkeysModal(true)}
@@ -187,143 +253,178 @@ export const Header: React.FC<HeaderProps> = ({
         </div>
       </div>
 
-      {/* Navigation Tabs - High-Density, Zero-Scroll Segmented Responsive Grid */}
+      {/* Navigation Tabs */}
       <div className="max-w-7xl mx-auto px-2 sm:px-4 lg:px-8 py-2 border-t border-slate-800">
-        <nav className="grid grid-cols-5 lg:grid-cols-10 gap-1 bg-slate-950/60 p-1.5 rounded-2xl border border-slate-800/80 shadow-inner">
+        <nav className="flex flex-wrap gap-1 bg-slate-950/60 p-1.5 rounded-2xl border border-slate-800/80 shadow-inner">
           {/* 1. Check-In */}
-          <button
-            onClick={() => setActiveTab('checkin')}
-            className={`flex flex-col sm:flex-row items-center justify-center space-y-0.5 sm:space-y-0 sm:space-x-1.5 px-2 py-2 rounded-xl text-xs font-bold transition duration-150 ${
-              activeTab === 'checkin'
-                ? 'bg-blue-600 text-white shadow-md shadow-blue-900/30'
-                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
-            }`}
-          >
-            <CheckCircle2 className="w-4 h-4 shrink-0" />
-            <span className="truncate">Check-In</span>
-          </button>
+          {isRoleAuthorizedForTab('checkin') && (
+            <button
+              onClick={() => setActiveTab('checkin')}
+              className={`flex-1 min-w-[70px] flex flex-col sm:flex-row items-center justify-center space-y-0.5 sm:space-y-0 sm:space-x-1.5 px-2 py-2 rounded-xl text-xs font-bold transition duration-150 ${
+                activeTab === 'checkin'
+                  ? 'bg-blue-600 text-white shadow-md shadow-blue-900/30'
+                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
+              }`}
+            >
+              <CheckCircle2 className="w-4 h-4 shrink-0" />
+              <span className="truncate">Check-In</span>
+            </button>
+          )}
 
           {/* 2. Members */}
-          <button
-            onClick={() => setActiveTab('members')}
-            className={`flex flex-col sm:flex-row items-center justify-center space-y-0.5 sm:space-y-0 sm:space-x-1.5 px-2 py-2 rounded-xl text-xs font-bold transition duration-150 ${
-              activeTab === 'members'
-                ? 'bg-blue-600 text-white shadow-md shadow-blue-900/30'
-                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
-            }`}
-          >
-            <Users className="w-4 h-4 shrink-0" />
-            <span className="truncate">Members</span>
-          </button>
+          {isRoleAuthorizedForTab('members') && (
+            <button
+              onClick={() => setActiveTab('members')}
+              className={`flex-1 min-w-[70px] flex flex-col sm:flex-row items-center justify-center space-y-0.5 sm:space-y-0 sm:space-x-1.5 px-2 py-2 rounded-xl text-xs font-bold transition duration-150 ${
+                activeTab === 'members'
+                  ? 'bg-blue-600 text-white shadow-md shadow-blue-900/30'
+                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
+              }`}
+            >
+              <Users className="w-4 h-4 shrink-0" />
+              <span className="truncate">Members</span>
+            </button>
+          )}
 
           {/* 3. Audit Log */}
-          <button
-            onClick={() => setActiveTab('attendance-history')}
-            className={`flex flex-col sm:flex-row items-center justify-center space-y-0.5 sm:space-y-0 sm:space-x-1.5 px-2 py-2 rounded-xl text-xs font-bold transition duration-150 ${
-              activeTab === 'attendance-history'
-                ? 'bg-amber-600 text-white shadow-md shadow-amber-900/30'
-                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
-            }`}
-          >
-            <History className="w-4 h-4 shrink-0" />
-            <span className="truncate">Audit</span>
-          </button>
+          {isRoleAuthorizedForTab('attendance-history') && (
+            <button
+              onClick={() => setActiveTab('attendance-history')}
+              className={`flex-1 min-w-[70px] flex flex-col sm:flex-row items-center justify-center space-y-0.5 sm:space-y-0 sm:space-x-1.5 px-2 py-2 rounded-xl text-xs font-bold transition duration-150 ${
+                activeTab === 'attendance-history'
+                  ? 'bg-amber-600 text-white shadow-md shadow-amber-900/30'
+                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
+              }`}
+            >
+              <History className="w-4 h-4 shrink-0" />
+              <span className="truncate">Audit</span>
+            </button>
+          )}
 
           {/* 4. Visitors */}
-          <button
-            onClick={() => setActiveTab('pipeline')}
-            className={`flex flex-col sm:flex-row items-center justify-center space-y-0.5 sm:space-y-0 sm:space-x-1.5 px-2 py-2 rounded-xl text-xs font-bold transition duration-150 ${
-              activeTab === 'pipeline'
-                ? 'bg-amber-600 text-white shadow-md shadow-amber-900/30'
-                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
-            }`}
-          >
-            <UserCheck className="w-4 h-4 shrink-0" />
-            <span className="truncate">Visitors</span>
-          </button>
+          {isRoleAuthorizedForTab('pipeline') && (
+            <button
+              onClick={() => setActiveTab('pipeline')}
+              className={`flex-1 min-w-[70px] flex flex-col sm:flex-row items-center justify-center space-y-0.5 sm:space-y-0 sm:space-x-1.5 px-2 py-2 rounded-xl text-xs font-bold transition duration-150 ${
+                activeTab === 'pipeline'
+                  ? 'bg-amber-600 text-white shadow-md shadow-amber-900/30'
+                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
+              }`}
+            >
+              <UserCheck className="w-4 h-4 shrink-0" />
+              <span className="truncate">Visitors</span>
+            </button>
+          )}
 
           {/* 5. Auxiliaries */}
-          <button
-            onClick={() => setActiveTab('departments')}
-            className={`flex flex-col sm:flex-row items-center justify-center space-y-0.5 sm:space-y-0 sm:space-x-1.5 px-2 py-2 rounded-xl text-xs font-bold transition duration-150 ${
-              activeTab === 'departments'
-                ? 'bg-purple-600 text-white shadow-md shadow-purple-900/30'
-                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
-            }`}
-          >
-            <Building2 className="w-4 h-4 shrink-0" />
-            <span className="truncate">Auxiliaries</span>
-          </button>
+          {isRoleAuthorizedForTab('departments') && (
+            <button
+              onClick={() => setActiveTab('departments')}
+              className={`flex-1 min-w-[70px] flex flex-col sm:flex-row items-center justify-center space-y-0.5 sm:space-y-0 sm:space-x-1.5 px-2 py-2 rounded-xl text-xs font-bold transition duration-150 ${
+                activeTab === 'departments'
+                  ? 'bg-purple-600 text-white shadow-md shadow-purple-900/30'
+                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
+              }`}
+            >
+              <Building2 className="w-4 h-4 shrink-0" />
+              <span className="truncate">Auxiliaries</span>
+            </button>
+          )}
 
           {/* 6. Finances */}
-          <button
-            onClick={() => setActiveTab('finances')}
-            className={`flex flex-col sm:flex-row items-center justify-center space-y-0.5 sm:space-y-0 sm:space-x-1.5 px-2 py-2 rounded-xl text-xs font-bold transition duration-150 ${
-              activeTab === 'finances'
-                ? 'bg-emerald-600 text-white shadow-md shadow-emerald-900/30'
-                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
-            }`}
-          >
-            <DollarSign className="w-4 h-4 shrink-0" />
-            <span className="truncate">Finances</span>
-          </button>
+          {isRoleAuthorizedForTab('finances') && (
+            <button
+              onClick={() => setActiveTab('finances')}
+              className={`flex-1 min-w-[70px] flex flex-col sm:flex-row items-center justify-center space-y-0.5 sm:space-y-0 sm:space-x-1.5 px-2 py-2 rounded-xl text-xs font-bold transition duration-150 ${
+                activeTab === 'finances'
+                  ? 'bg-emerald-600 text-white shadow-md shadow-emerald-900/30'
+                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
+              }`}
+            >
+              <DollarSign className="w-4 h-4 shrink-0" />
+              <span className="truncate">Finances</span>
+            </button>
+          )}
 
           {/* 7. Pledges */}
-          <button
-            onClick={() => setActiveTab('campaigns')}
-            className={`flex flex-col sm:flex-row items-center justify-center space-y-0.5 sm:space-y-0 sm:space-x-1.5 px-2 py-2 rounded-xl text-xs font-bold transition duration-150 ${
-              activeTab === 'campaigns'
-                ? 'bg-indigo-600 text-white shadow-md shadow-indigo-900/30'
-                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
-            }`}
-          >
-            <Building className="w-4 h-4 shrink-0" />
-            <span className="truncate">Pledges</span>
-          </button>
+          {isRoleAuthorizedForTab('campaigns') && (
+            <button
+              onClick={() => setActiveTab('campaigns')}
+              className={`flex-1 min-w-[70px] flex flex-col sm:flex-row items-center justify-center space-y-0.5 sm:space-y-0 sm:space-x-1.5 px-2 py-2 rounded-xl text-xs font-bold transition duration-150 ${
+                activeTab === 'campaigns'
+                  ? 'bg-indigo-600 text-white shadow-md shadow-indigo-900/30'
+                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
+              }`}
+            >
+              <Building className="w-4 h-4 shrink-0" />
+              <span className="truncate">Pledges</span>
+            </button>
+          )}
 
           {/* 8. Celebrations */}
-          <button
-            onClick={() => setActiveTab('celebrations')}
-            className={`flex flex-col sm:flex-row items-center justify-center space-y-0.5 sm:space-y-0 sm:space-x-1.5 px-2 py-2 rounded-xl text-xs font-bold transition duration-150 relative ${
-              activeTab === 'celebrations'
-                ? 'bg-rose-600 text-white shadow-md shadow-rose-900/30'
-                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
-            }`}
-          >
-            <div className="relative flex items-center">
-              <Cake className="w-4 h-4 shrink-0" />
-              {typeof todayCelebrantsCount === 'number' && todayCelebrantsCount > 0 && (
-                <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-rose-400 animate-pulse"></span>
-              )}
-            </div>
-            <span className="truncate">Celebrations</span>
-          </button>
+          {isRoleAuthorizedForTab('celebrations') && (
+            <button
+              onClick={() => setActiveTab('celebrations')}
+              className={`flex-1 min-w-[70px] flex flex-col sm:flex-row items-center justify-center space-y-0.5 sm:space-y-0 sm:space-x-1.5 px-2 py-2 rounded-xl text-xs font-bold transition duration-150 relative ${
+                activeTab === 'celebrations'
+                  ? 'bg-rose-600 text-white shadow-md shadow-rose-900/30'
+                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
+              }`}
+            >
+              <div className="relative flex items-center">
+                <Cake className="w-4 h-4 shrink-0" />
+                {typeof todayCelebrantsCount === 'number' && todayCelebrantsCount > 0 && (
+                  <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-rose-400 animate-pulse"></span>
+                )}
+              </div>
+              <span className="truncate">Celebrations</span>
+            </button>
+          )}
 
           {/* 9. SMS & WhatsApp */}
-          <button
-            onClick={() => setActiveTab('messaging')}
-            className={`flex flex-col sm:flex-row items-center justify-center space-y-0.5 sm:space-y-0 sm:space-x-1.5 px-2 py-2 rounded-xl text-xs font-bold transition duration-150 ${
-              activeTab === 'messaging'
-                ? 'bg-cyan-600 text-white shadow-md shadow-cyan-900/30'
-                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
-            }`}
-          >
-            <MessageSquare className="w-4 h-4 shrink-0" />
-            <span className="truncate">SMS Broadcast</span>
-          </button>
+          {isRoleAuthorizedForTab('messaging') && (
+            <button
+              onClick={() => setActiveTab('messaging')}
+              className={`flex-1 min-w-[70px] flex flex-col sm:flex-row items-center justify-center space-y-0.5 sm:space-y-0 sm:space-x-1.5 px-2 py-2 rounded-xl text-xs font-bold transition duration-150 ${
+                activeTab === 'messaging'
+                  ? 'bg-cyan-600 text-white shadow-md shadow-cyan-900/30'
+                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
+              }`}
+            >
+              <MessageSquare className="w-4 h-4 shrink-0" />
+              <span className="truncate">SMS Broadcast</span>
+            </button>
+          )}
 
           {/* 10. Analytics */}
-          <button
-            onClick={() => setActiveTab('analytics')}
-            className={`flex flex-col sm:flex-row items-center justify-center space-y-0.5 sm:space-y-0 sm:space-x-1.5 px-2 py-2 rounded-xl text-xs font-bold transition duration-150 ${
-              activeTab === 'analytics'
-                ? 'bg-blue-700 text-white shadow-md shadow-blue-950/40'
-                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
-            }`}
-          >
-            <TrendingUp className="w-4 h-4 shrink-0" />
-            <span className="truncate">Analytics</span>
-          </button>
+          {isRoleAuthorizedForTab('analytics') && (
+            <button
+              onClick={() => setActiveTab('analytics')}
+              className={`flex-1 min-w-[70px] flex flex-col sm:flex-row items-center justify-center space-y-0.5 sm:space-y-0 sm:space-x-1.5 px-2 py-2 rounded-xl text-xs font-bold transition duration-150 ${
+                activeTab === 'analytics'
+                  ? 'bg-blue-700 text-white shadow-md shadow-blue-950/40'
+                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
+              }`}
+            >
+              <TrendingUp className="w-4 h-4 shrink-0" />
+              <span className="truncate">Analytics</span>
+            </button>
+          )}
+
+          {/* 11. Role Users */}
+          {isRoleAuthorizedForTab('users') && (
+            <button
+              onClick={() => setActiveTab('users')}
+              className={`flex-1 min-w-[70px] flex flex-col sm:flex-row items-center justify-center space-y-0.5 sm:space-y-0 sm:space-x-1.5 px-2 py-2 rounded-xl text-xs font-bold transition duration-150 ${
+                activeTab === 'users'
+                  ? 'bg-red-600 text-white shadow-md shadow-red-900/30'
+                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
+              }`}
+            >
+              <Shield className="w-4 h-4 shrink-0" />
+              <span className="truncate">Users</span>
+            </button>
+          )}
         </nav>
       </div>
 
@@ -428,12 +529,20 @@ export const Header: React.FC<HeaderProps> = ({
                 <span className="font-mono font-bold bg-blue-600 px-2 py-0.5 rounded text-white">Enter</span>
               </div>
               <div className="flex items-center justify-between p-2 rounded-lg bg-slate-800">
-                <span className="text-slate-300">Filter Group 1</span>
-                <span className="font-mono font-bold bg-blue-600 px-2 py-0.5 rounded text-white">1</span>
+                <span className="text-slate-300">Filter Joy Cell</span>
+                <span className="font-mono font-bold bg-amber-500 text-slate-950 px-2 py-0.5 rounded">1</span>
               </div>
               <div className="flex items-center justify-between p-2 rounded-lg bg-slate-800">
-                <span className="text-slate-300">Filter Group 2</span>
-                <span className="font-mono font-bold bg-purple-600 px-2 py-0.5 rounded text-white">2</span>
+                <span className="text-slate-300">Filter Faith Cell</span>
+                <span className="font-mono font-bold bg-blue-600 px-2 py-0.5 rounded text-white">2</span>
+              </div>
+              <div className="flex items-center justify-between p-2 rounded-lg bg-slate-800">
+                <span className="text-slate-300">Filter Hope Cell</span>
+                <span className="font-mono font-bold bg-emerald-600 px-2 py-0.5 rounded text-white">3</span>
+              </div>
+              <div className="flex items-center justify-between p-2 rounded-lg bg-slate-800">
+                <span className="text-slate-300">Filter Love Cell</span>
+                <span className="font-mono font-bold bg-rose-600 px-2 py-0.5 rounded text-white">4</span>
               </div>
               <div className="flex items-center justify-between p-2 rounded-lg bg-slate-800">
                 <span className="text-slate-300">Show All Members</span>

@@ -28,6 +28,7 @@ interface MembersDirectoryProps {
   onUpdateMember: (id: string, memberData: any) => Promise<void>;
   onDeleteMember: (id: string) => Promise<void>;
   onInspectMemberHistory?: (member: Member) => void;
+  onInspectMemberProfile?: (member: Member) => void;
 }
 
 export const MembersDirectory: React.FC<MembersDirectoryProps> = ({
@@ -35,10 +36,11 @@ export const MembersDirectory: React.FC<MembersDirectoryProps> = ({
   onAddMember,
   onUpdateMember,
   onDeleteMember,
-  onInspectMemberHistory
+  onInspectMemberHistory,
+  onInspectMemberProfile
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
-  const [groupFilter, setGroupFilter] = useState<'ALL' | 'GROUP_1' | 'GROUP_2'>('ALL');
+  const [groupFilter, setGroupFilter] = useState<'ALL' | 'JOY' | 'FAITH' | 'HOPE' | 'LOVE'>('ALL');
 
   // Modal states
   const [showAddModal, setShowAddModal] = useState(false);
@@ -53,7 +55,7 @@ export const MembersDirectory: React.FC<MembersDirectoryProps> = ({
   const [email, setEmail] = useState('');
   const [gender, setGender] = useState<Gender>('MALE');
   const [maritalStatus, setMaritalStatus] = useState<MaritalStatus>('SINGLE');
-  const [churchGroup, setChurchGroup] = useState<ChurchGroup>('GROUP_1');
+  const [churchGroup, setChurchGroup] = useState<ChurchGroup>('JOY');
   const [role, setRole] = useState('Member');
   const [status, setStatus] = useState<MemberStatus>('ACTIVE');
   const [dateOfBirth, setDateOfBirth] = useState('');
@@ -75,7 +77,7 @@ export const MembersDirectory: React.FC<MembersDirectoryProps> = ({
     setEmail('');
     setGender('MALE');
     setMaritalStatus('SINGLE');
-    setChurchGroup('GROUP_1');
+    setChurchGroup('JOY');
     setRole('Member');
     setStatus('ACTIVE');
     setDateOfBirth('');
@@ -227,7 +229,7 @@ export const MembersDirectory: React.FC<MembersDirectoryProps> = ({
       m.lastName,
       m.phone || '',
       m.email || '',
-      m.churchGroup === 'GROUP_1' ? 'Group 1' : 'Group 2',
+      m.churchGroup === 'JOY' ? 'Joy Cell' : m.churchGroup === 'FAITH' ? 'Faith Cell' : m.churchGroup === 'HOPE' ? 'Hope Cell' : 'Love Cell',
       m.role,
       m.gender,
       m.maritalStatus || 'SINGLE',
@@ -297,31 +299,47 @@ export const MembersDirectory: React.FC<MembersDirectoryProps> = ({
           />
         </div>
 
-        {/* Group Filter */}
-        <div className="flex items-center space-x-1.5 bg-slate-100 p-1.5 rounded-2xl">
+        {/* Cell Filter */}
+        <div className="flex flex-wrap items-center gap-1.5 bg-slate-100 p-1.5 rounded-2xl">
           <button
             onClick={() => setGroupFilter('ALL')}
             className={`px-3 py-1.5 rounded-xl text-xs font-bold transition ${
-              groupFilter === 'ALL' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600'
+              groupFilter === 'ALL' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600 hover:text-slate-900'
             }`}
           >
             All Members ({members.length})
           </button>
           <button
-            onClick={() => setGroupFilter('GROUP_1')}
+            onClick={() => setGroupFilter('JOY')}
             className={`px-3 py-1.5 rounded-xl text-xs font-bold transition ${
-              groupFilter === 'GROUP_1' ? 'bg-blue-600 text-white shadow-sm' : 'text-blue-700'
+              groupFilter === 'JOY' ? 'bg-amber-500 text-slate-950 shadow-sm' : 'text-amber-800 hover:bg-amber-100/50'
             }`}
           >
-            Group 1 ({members.filter((m) => m.churchGroup === 'GROUP_1').length})
+            Joy Cell ({members.filter((m) => m.churchGroup === 'JOY').length})
           </button>
           <button
-            onClick={() => setGroupFilter('GROUP_2')}
+            onClick={() => setGroupFilter('FAITH')}
             className={`px-3 py-1.5 rounded-xl text-xs font-bold transition ${
-              groupFilter === 'GROUP_2' ? 'bg-purple-600 text-white shadow-sm' : 'text-purple-700'
+              groupFilter === 'FAITH' ? 'bg-blue-600 text-white shadow-sm' : 'text-blue-800 hover:bg-blue-100/50'
             }`}
           >
-            Group 2 ({members.filter((m) => m.churchGroup === 'GROUP_2').length})
+            Faith Cell ({members.filter((m) => m.churchGroup === 'FAITH').length})
+          </button>
+          <button
+            onClick={() => setGroupFilter('HOPE')}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition ${
+              groupFilter === 'HOPE' ? 'bg-emerald-600 text-white shadow-sm' : 'text-emerald-800 hover:bg-emerald-100/50'
+            }`}
+          >
+            Hope Cell ({members.filter((m) => m.churchGroup === 'HOPE').length})
+          </button>
+          <button
+            onClick={() => setGroupFilter('LOVE')}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition ${
+              groupFilter === 'LOVE' ? 'bg-rose-600 text-white shadow-sm' : 'text-rose-800 hover:bg-rose-100/50'
+            }`}
+          >
+            Love Cell ({members.filter((m) => m.churchGroup === 'LOVE').length})
           </button>
         </div>
       </div>
@@ -346,8 +364,12 @@ export const MembersDirectory: React.FC<MembersDirectoryProps> = ({
                 <tr
                   key={member.id}
                   onClick={() => {
-                    setSelectedMember(member);
-                    setIsEditingInProfile(false);
+                    if (onInspectMemberProfile) {
+                      onInspectMemberProfile(member);
+                    } else {
+                      setSelectedMember(member);
+                      setIsEditingInProfile(false);
+                    }
                   }}
                   className="hover:bg-blue-50/50 cursor-pointer transition select-none group"
                 >
@@ -363,7 +385,13 @@ export const MembersDirectory: React.FC<MembersDirectoryProps> = ({
                       ) : (
                         <div
                           className={`w-11 h-11 rounded-2xl flex items-center justify-center font-extrabold text-sm text-white shrink-0 shadow-sm ${
-                            member.churchGroup === 'GROUP_1' ? 'bg-blue-600' : 'bg-purple-600'
+                            member.churchGroup === 'JOY'
+                              ? 'bg-amber-500 text-slate-950'
+                              : member.churchGroup === 'FAITH'
+                              ? 'bg-blue-600 text-white'
+                              : member.churchGroup === 'HOPE'
+                              ? 'bg-emerald-600 text-white'
+                              : 'bg-rose-600 text-white'
                           }`}
                         >
                           {member.firstName[0]}
@@ -392,12 +420,22 @@ export const MembersDirectory: React.FC<MembersDirectoryProps> = ({
                   <td className="px-4 py-4">
                     <span
                       className={`px-2.5 py-0.5 rounded-full font-extrabold text-[10px] uppercase tracking-wider inline-block ${
-                        member.churchGroup === 'GROUP_1'
-                          ? 'bg-blue-100 text-blue-800'
-                          : 'bg-purple-100 text-purple-800'
+                        member.churchGroup === 'JOY'
+                          ? 'bg-amber-100 text-amber-900 border border-amber-300'
+                          : member.churchGroup === 'FAITH'
+                          ? 'bg-blue-100 text-blue-800 border border-blue-300'
+                          : member.churchGroup === 'HOPE'
+                          ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                          : 'bg-rose-100 text-rose-800 border border-rose-300'
                       }`}
                     >
-                      {member.churchGroup === 'GROUP_1' ? 'Group 1' : 'Group 2'}
+                      {member.churchGroup === 'JOY'
+                        ? 'Joy Cell'
+                        : member.churchGroup === 'FAITH'
+                        ? 'Faith Cell'
+                        : member.churchGroup === 'HOPE'
+                        ? 'Hope Cell'
+                        : 'Love Cell'}
                     </span>
                   </td>
 
@@ -744,14 +782,16 @@ export const MembersDirectory: React.FC<MembersDirectoryProps> = ({
                   {/* Group, Gender, Marital, Role */}
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                     <div>
-                      <label className="block text-xs font-bold text-slate-700 mb-1">Church Group *</label>
+                      <label className="block text-xs font-bold text-slate-700 mb-1">Assigned Cell *</label>
                       <select
                         value={churchGroup}
                         onChange={(e) => setChurchGroup(e.target.value as ChurchGroup)}
                         className="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs font-bold"
                       >
-                        <option value="GROUP_1">Group 1</option>
-                        <option value="GROUP_2">Group 2</option>
+                        <option value="JOY">Joy Cell</option>
+                        <option value="FAITH">Faith Cell</option>
+                        <option value="HOPE">Hope Cell</option>
+                        <option value="LOVE">Love Cell</option>
                       </select>
                     </div>
 
@@ -1003,14 +1043,16 @@ export const MembersDirectory: React.FC<MembersDirectoryProps> = ({
               {/* Group, Gender, Marital, Role */}
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">Church Group *</label>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">Assigned Cell *</label>
                   <select
                     value={churchGroup}
                     onChange={(e) => setChurchGroup(e.target.value as ChurchGroup)}
                     className="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs font-bold focus:ring-2 focus:ring-blue-500 focus:outline-none"
                   >
-                    <option value="GROUP_1">Group 1</option>
-                    <option value="GROUP_2">Group 2</option>
+                    <option value="JOY">Joy Cell</option>
+                    <option value="FAITH">Faith Cell</option>
+                    <option value="HOPE">Hope Cell</option>
+                    <option value="LOVE">Love Cell</option>
                   </select>
                 </div>
 

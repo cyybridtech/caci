@@ -10,8 +10,11 @@ import {
   MessageStatus
 } from '@prisma/client';
 import { sendVynfySMS } from '../services/vynfyService.js';
+import { requireAuth } from '../middleware/auth.js';
 
 export const campaignRouter = Router();
+
+campaignRouter.use(requireAuth);
 
 // GET /api/campaigns - list all campaigns with summary statistics
 campaignRouter.get('/', async (req: Request, res: Response) => {

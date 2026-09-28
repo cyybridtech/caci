@@ -1,8 +1,11 @@
 import { Router, Request, Response } from 'express';
 import { prisma } from '../db.js';
-import { FinancialCategory, PaymentMethod, ChurchGroup } from '@prisma/client';
+import { FinancialCategory, PaymentMethod, ChurchGroup, UserRole } from '@prisma/client';
+import { requireAuth, requireRole } from '../middleware/auth.js';
 
 export const financeRouter = Router();
+
+financeRouter.use(requireAuth);
 
 // GET /api/finances - list all contributions
 financeRouter.get('/', async (req: Request, res: Response) => {
@@ -51,7 +54,7 @@ financeRouter.get('/', async (req: Request, res: Response) => {
         }
       },
       orderBy: { transactionDate: 'desc' },
-      take: 100
+      take: 200
     });
 
     res.json(records);
@@ -61,8 +64,8 @@ financeRouter.get('/', async (req: Request, res: Response) => {
   }
 });
 
-// POST /api/finances - record contribution (with transaction date, without ref code)
-financeRouter.post('/', async (req: Request, res: Response) => {
+// POST /api/finances - record contribution (Admin & Finance team)
+financeRouter.post('/', requireRole(UserRole.ADMIN, UserRole.FINANCE), async (req: Request, res: Response) => {
   try {
     const {
       memberId,
@@ -110,7 +113,7 @@ financeRouter.post('/', async (req: Request, res: Response) => {
   }
 });
 
-// GET /api/finances/summary - summary totals
+// GET /api/finances/summary - summary totals across 4 cells
 financeRouter.get('/summary', async (req: Request, res: Response) => {
   try {
     const allRecords = await prisma.financialContribution.findMany({
@@ -131,8 +134,10 @@ financeRouter.get('/summary', async (req: Request, res: Response) => {
       SPECIAL_SEED: 0
     };
 
-    let group1Amount = 0;
-    let group2Amount = 0;
+    let joyAmount = 0;
+    let faithAmount = 0;
+    let hopeAmount = 0;
+    let loveAmount = 0;
     let unassignedAmount = 0;
 
     for (const r of allRecords) {
@@ -146,11 +151,11 @@ financeRouter.get('/summary', async (req: Request, res: Response) => {
       }
 
       if (r.member) {
-        if (r.member.churchGroup === ChurchGroup.GROUP_1) {
-          group1Amount += amt;
-        } else if (r.member.churchGroup === ChurchGroup.GROUP_2) {
-          group2Amount += amt;
-        }
+        if (r.member.churchGroup === ChurchGroup.JOY) joyAmount += amt;
+        else if (r.member.churchGroup === ChurchGroup.FAITH) faithAmount += amt;
+        else if (r.member.churchGroup === ChurchGroup.HOPE) hopeAmount += amt;
+        else if (r.member.churchGroup === ChurchGroup.LOVE) loveAmount += amt;
+        else unassignedAmount += amt;
       } else {
         unassignedAmount += amt;
       }
@@ -159,9 +164,16 @@ financeRouter.get('/summary', async (req: Request, res: Response) => {
     res.json({
       totalAmount,
       categoryTotals,
+      cellComparison: {
+        JOY: joyAmount,
+        FAITH: faithAmount,
+        HOPE: hopeAmount,
+        LOVE: loveAmount,
+        generalOfferings: unassignedAmount
+      },
       groupComparison: {
-        group1: group1Amount,
-        group2: group2Amount,
+        group1: joyAmount,
+        group2: faithAmount,
         generalOfferings: unassignedAmount
       },
       recordCount: allRecords.length

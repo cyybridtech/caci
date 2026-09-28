@@ -10,8 +10,13 @@ import { FinancesView } from './components/FinancesView.tsx';
 import { MessagingView } from './components/MessagingView.tsx';
 import { CelebrationsView } from './components/CelebrationsView.tsx';
 import { CampaignsView } from './components/CampaignsView.tsx';
+import { UserManagement } from './components/UserManagement.tsx';
+import { LoginPage } from './components/LoginPage.tsx';
+import { ChangePasswordModal } from './components/ChangePasswordModal.tsx';
+import { MemberProfileModal } from './components/MemberProfileModal.tsx';
 import { Footer } from './components/Footer.tsx';
 import { MemberAttendanceHistoryModal } from './components/MemberAttendanceHistoryModal.tsx';
+import { useAuth } from './context/AuthContext.tsx';
 import { api } from './services/api.ts';
 import { offlineSync } from './services/offlineSync.ts';
 import {
@@ -28,6 +33,8 @@ import {
 } from './types/index.ts';
 
 export const App: React.FC = () => {
+  const { user, isAuthenticated, logout } = useAuth();
+
   const [activeTab, setActiveTab] = useState<
     | 'checkin'
     | 'members'
@@ -39,6 +46,7 @@ export const App: React.FC = () => {
     | 'campaigns'
     | 'celebrations'
     | 'messaging'
+    | 'users'
   >('checkin');
 
   // Core data states
@@ -55,6 +63,7 @@ export const App: React.FC = () => {
 
   // Modals
   const [inspectingHistoryMember, setInspectingHistoryMember] = useState<Member | null>(null);
+  const [profileMember, setProfileMember] = useState<Member | null>(null);
 
   // UI & Sync states
   const [isLoading, setIsLoading] = useState(true);
@@ -83,13 +92,14 @@ export const App: React.FC = () => {
   }, []);
 
   const loadData = useCallback(async () => {
+    if (!isAuthenticated) return;
     try {
       setIsLoading(true);
       const [fetchedSessions, fetchedActive, fetchedMembers, fetchedDepts] = await Promise.all([
         api.getSessions(),
         api.getActiveSession(),
         api.getMembers(),
-        api.getDepartments()
+        api.getDepartments().catch(() => [])
       ]);
 
       setSessions(fetchedSessions);
@@ -99,11 +109,11 @@ export const App: React.FC = () => {
 
       if (fetchedActive) {
         const [attRecords, attStats, fetchedFinances, finSummary, msgs, celData] = await Promise.all([
-          api.getSessionAttendance(fetchedActive.id),
-          api.getAttendanceStats(fetchedActive.id),
-          api.getFinances(),
-          api.getFinancialSummary(),
-          api.getMessageLogs(),
+          api.getSessionAttendance(fetchedActive.id).catch(() => []),
+          api.getAttendanceStats(fetchedActive.id).catch(() => null),
+          api.getFinances().catch(() => []),
+          api.getFinancialSummary().catch(() => null),
+          api.getMessageLogs().catch(() => []),
           api.getTodayCelebrants().catch(() => [])
         ]);
 
@@ -122,11 +132,16 @@ export const App: React.FC = () => {
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [isAuthenticated]);
 
   useEffect(() => {
     loadData();
   }, [loadData]);
+
+  // If not logged in, render the login page
+  if (!isAuthenticated) {
+    return <LoginPage />;
+  }
 
   // Session selection handler
   const handleSelectSession = async (session: ServiceSession) => {
@@ -143,7 +158,7 @@ export const App: React.FC = () => {
     }
   };
 
-  // Date selection handler: picks or creates a session for the chosen date!
+  // Date selection handler
   const handleSelectDate = async (dateStr: string) => {
     try {
       let session = await api.getSessionByDate(dateStr, true);
@@ -155,7 +170,6 @@ export const App: React.FC = () => {
         });
       }
 
-      // Update sessions list if new
       setSessions((prev) => {
         if (session && !prev.some((s) => s.id === session.id)) {
           return [session, ...prev];
@@ -189,17 +203,11 @@ export const App: React.FC = () => {
         totalPresent: 0,
         totalAbsent: members.length,
         overallPercentage: 0,
-        group1: {
-          total: members.filter((m) => m.churchGroup === 'GROUP_1').length,
-          present: 0,
-          absent: members.filter((m) => m.churchGroup === 'GROUP_1').length,
-          percentage: 0
-        },
-        group2: {
-          total: members.filter((m) => m.churchGroup === 'GROUP_2').length,
-          present: 0,
-          absent: members.filter((m) => m.churchGroup === 'GROUP_2').length,
-          percentage: 0
+        cells: {
+          JOY: { total: members.filter(m => m.churchGroup === 'JOY').length, present: 0, absent: members.filter(m => m.churchGroup === 'JOY').length, percentage: 0 },
+          FAITH: { total: members.filter(m => m.churchGroup === 'FAITH').length, present: 0, absent: members.filter(m => m.churchGroup === 'FAITH').length, percentage: 0 },
+          HOPE: { total: members.filter(m => m.churchGroup === 'HOPE').length, present: 0, absent: members.filter(m => m.churchGroup === 'HOPE').length, percentage: 0 },
+          LOVE: { total: members.filter(m => m.churchGroup === 'LOVE').length, present: 0, absent: members.filter(m => m.churchGroup === 'LOVE').length, percentage: 0 },
         }
       });
       showToast(`Created service session: ${newSession.serviceType}`);
@@ -220,38 +228,37 @@ export const App: React.FC = () => {
       sessionId: activeSession.id,
       memberId,
       checkInTime: new Date().toISOString(),
-      markedBy: 'Media Desk',
+      markedBy: user?.username || 'Media Desk',
       member
     };
 
     setAttendanceRecords((prev) => [optimisticRecord, ...prev]);
 
     if (stats) {
-      const isGroup1 = member.churchGroup === 'GROUP_1';
+      const cellKey = member.churchGroup;
       const newPresent = stats.totalPresent + 1;
+      const currentCell = stats.cells?.[cellKey] || { total: 0, present: 0, absent: 0, percentage: 0 };
+      const newCellPresent = currentCell.present + 1;
+
       setStats({
         ...stats,
         totalPresent: newPresent,
         totalAbsent: Math.max(0, stats.totalMembers - newPresent),
         overallPercentage: Math.round((newPresent / (stats.totalMembers || 1)) * 100),
-        group1: {
-          ...stats.group1,
-          present: isGroup1 ? stats.group1.present + 1 : stats.group1.present,
-          percentage: isGroup1
-            ? Math.round(((stats.group1.present + 1) / (stats.group1.total || 1)) * 100)
-            : stats.group1.percentage
-        },
-        group2: {
-          ...stats.group2,
-          present: !isGroup1 ? stats.group2.present + 1 : stats.group2.present,
-          percentage: !isGroup1
-            ? Math.round(((stats.group2.present + 1) / (stats.group2.total || 1)) * 100)
-            : stats.group2.percentage
+        cells: {
+          ...stats.cells,
+          [cellKey]: {
+            ...currentCell,
+            present: newCellPresent,
+            absent: Math.max(0, currentCell.total - newCellPresent),
+            percentage: currentCell.total > 0 ? Math.round((newCellPresent / currentCell.total) * 100) : 0
+          }
         }
       });
     }
 
-    showToast(`Checked in: ${member.firstName} ${member.lastName} (${member.churchGroup === 'GROUP_1' ? 'Group 1' : 'Group 2'})`);
+    const cellName = member.churchGroup === 'JOY' ? 'Joy Cell' : member.churchGroup === 'FAITH' ? 'Faith Cell' : member.churchGroup === 'HOPE' ? 'Hope Cell' : 'Love Cell';
+    showToast(`Checked in: ${member.firstName} ${member.lastName} (${cellName})`);
 
     if (!isOnline) {
       offlineSync.queueAttendance({
@@ -259,14 +266,14 @@ export const App: React.FC = () => {
         memberId,
         memberName: `${member.firstName} ${member.lastName}`,
         churchGroup: member.churchGroup,
-        markedBy: 'Media Desk (Offline)',
+        markedBy: `${user?.username || 'Media Desk'} (Offline)`,
         checkInTime: new Date().toISOString()
       });
       return;
     }
 
     try {
-      const res = await api.checkIn(activeSession.id, memberId);
+      const res = await api.checkIn(activeSession.id, memberId, user?.username);
       setAttendanceRecords((prev) =>
         prev.map((r) => (r.memberId === memberId ? res.record : r))
       );
@@ -277,7 +284,7 @@ export const App: React.FC = () => {
         memberId,
         memberName: `${member.firstName} ${member.lastName}`,
         churchGroup: member.churchGroup,
-        markedBy: 'Media Desk (Offline Fallback)',
+        markedBy: `${user?.username || 'Media Desk'} (Offline Fallback)`,
         checkInTime: new Date().toISOString()
       });
       showToast(`Saved to offline queue: ${member.firstName} ${member.lastName}`);
@@ -292,26 +299,24 @@ export const App: React.FC = () => {
     setAttendanceRecords((prev) => prev.filter((r) => r.memberId !== memberId));
 
     if (stats && member) {
-      const isGroup1 = member.churchGroup === 'GROUP_1';
+      const cellKey = member.churchGroup;
       const newPresent = Math.max(0, stats.totalPresent - 1);
+      const currentCell = stats.cells?.[cellKey] || { total: 0, present: 0, absent: 0, percentage: 0 };
+      const newCellPresent = Math.max(0, currentCell.present - 1);
+
       setStats({
         ...stats,
         totalPresent: newPresent,
         totalAbsent: Math.min(stats.totalMembers, stats.totalAbsent + 1),
         overallPercentage: Math.round((newPresent / (stats.totalMembers || 1)) * 100),
-        group1: {
-          ...stats.group1,
-          present: isGroup1 ? Math.max(0, stats.group1.present - 1) : stats.group1.present,
-          percentage: isGroup1
-            ? Math.round((Math.max(0, stats.group1.present - 1) / (stats.group1.total || 1)) * 100)
-            : stats.group1.percentage
-        },
-        group2: {
-          ...stats.group2,
-          present: !isGroup1 ? Math.max(0, stats.group2.present - 1) : stats.group2.present,
-          percentage: !isGroup1
-            ? Math.round((Math.max(0, stats.group2.present - 1) / (stats.group2.total || 1)) * 100)
-            : stats.group2.percentage
+        cells: {
+          ...stats.cells,
+          [cellKey]: {
+            ...currentCell,
+            present: newCellPresent,
+            absent: Math.max(0, currentCell.total - newCellPresent),
+            percentage: currentCell.total > 0 ? Math.round((newCellPresent / currentCell.total) * 100) : 0
+          }
         }
       });
     }
@@ -421,6 +426,9 @@ export const App: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-slate-100 flex flex-col selection:bg-blue-600 selection:text-white">
+      {/* Forced Password Change Modal for new accounts */}
+      {user?.mustChangePassword && <ChangePasswordModal />}
+
       {/* Toast Notification */}
       {toastMessage && (
         <div className="fixed bottom-6 right-6 z-50 bg-slate-900 text-white px-5 py-3 rounded-2xl shadow-2xl border border-slate-700 font-bold text-xs animate-in slide-in-from-bottom-4 duration-300 flex items-center space-x-2">
@@ -442,6 +450,8 @@ export const App: React.FC = () => {
         onSync={handleManualSync}
         isSyncing={isSyncing}
         todayCelebrantsCount={todayCelebrantsCount}
+        currentUser={user}
+        onLogout={logout}
       />
 
       {/* Main Workspace Body */}
@@ -473,6 +483,8 @@ export const App: React.FC = () => {
                 onAddMember={handleAddMember}
                 onUpdateMember={handleUpdateMember}
                 onDeleteMember={handleDeleteMember}
+                onInspectMemberProfile={(m) => setProfileMember(m)}
+                onInspectMemberHistory={(m) => setInspectingHistoryMember(m)}
               />
             )}
 
@@ -510,16 +522,9 @@ export const App: React.FC = () => {
               />
             )}
 
-            {activeTab === 'campaigns' && (
-              <CampaignsView
-                members={members}
-              />
-            )}
+            {activeTab === 'campaigns' && <CampaignsView members={members} />}
 
-            {activeTab === 'celebrations' && (
-              <CelebrationsView
-              />
-            )}
+            {activeTab === 'celebrations' && <CelebrationsView />}
 
             {activeTab === 'messaging' && (
               <MessagingView
@@ -533,6 +538,8 @@ export const App: React.FC = () => {
                 initialDeptId={messagingDeptId}
               />
             )}
+
+            {activeTab === 'users' && <UserManagement />}
           </>
         )}
       </main>
@@ -547,7 +554,20 @@ export const App: React.FC = () => {
         onSelectAnotherMember={(m) => setInspectingHistoryMember(m)}
         onClose={() => setInspectingHistoryMember(null)}
       />
+
+      {/* Full Detail Member Profile Modal (Bio, Tithes, Welfare, Pledges, Attendance) */}
+      {profileMember && (
+        <MemberProfileModal
+          member={profileMember}
+          onClose={() => setProfileMember(null)}
+          onEdit={(m) => {
+            setProfileMember(null);
+            // Open in edit mode
+          }}
+        />
+      )}
     </div>
   );
 };
+
 export default App;

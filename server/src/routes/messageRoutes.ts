@@ -1,12 +1,15 @@
 import { Router, Request, Response } from 'express';
 import { prisma } from '../db.js';
-import { MessageChannel, MessageStatus, ChurchGroup } from '@prisma/client';
+import { MessageChannel, MessageStatus, ChurchGroup, UserRole } from '@prisma/client';
 import { sendVynfySMS } from '../services/vynfyService.js';
+import { requireAuth, requireRole } from '../middleware/auth.js';
 
 export const messageRouter = Router();
 
-// GET /api/messages - message log history
-messageRouter.get('/', async (req: Request, res: Response) => {
+messageRouter.use(requireAuth);
+
+// GET /api/messages - message log history (Admin & Media Team)
+messageRouter.get('/', requireRole(UserRole.ADMIN, UserRole.MEDIA_TEAM), async (req: Request, res: Response) => {
   try {
     const logs = await prisma.messageLog.findMany({
       orderBy: { sentAt: 'desc' },
@@ -19,8 +22,8 @@ messageRouter.get('/', async (req: Request, res: Response) => {
   }
 });
 
-// POST /api/messages/send - send single message
-messageRouter.post('/send', async (req: Request, res: Response) => {
+// POST /api/messages/send - send single message (Admin & Media Team)
+messageRouter.post('/send', requireRole(UserRole.ADMIN, UserRole.MEDIA_TEAM), async (req: Request, res: Response) => {
   try {
     const { channel, recipientPhone, recipientName, messageContent, category } = req.body;
 
@@ -64,12 +67,12 @@ messageRouter.post('/send', async (req: Request, res: Response) => {
   }
 });
 
-// POST /api/messages/broadcast - automated batch broadcaster with Vynfy Gateway & Specific Members
-messageRouter.post('/broadcast', async (req: Request, res: Response) => {
+// POST /api/messages/broadcast - automated batch broadcaster with Vynfy Gateway
+messageRouter.post('/broadcast', requireRole(UserRole.ADMIN, UserRole.MEDIA_TEAM), async (req: Request, res: Response) => {
   try {
     const {
-      targetType, // 'SPECIFIC_MEMBERS' | 'ALL_MEMBERS' | 'ATTENDEES_TODAY' | 'ABSENTEES_TODAY' | 'GROUP_1' | 'GROUP_2' | 'DEPARTMENT'
-      memberIds, // string[] (for SPECIFIC_MEMBERS)
+      targetType, // 'SPECIFIC_MEMBERS' | 'ALL_MEMBERS' | 'ATTENDEES_TODAY' | 'ABSENTEES_TODAY' | 'JOY' | 'FAITH' | 'HOPE' | 'LOVE' | 'DEPARTMENT'
+      memberIds,
       sessionId,
       departmentId,
       channel, // 'SMS' | 'WHATSAPP'
@@ -116,13 +119,21 @@ messageRouter.post('/broadcast', async (req: Request, res: Response) => {
         where: { status: 'ACTIVE' }
       });
       recipients = allActive.filter(m => !presentIds.has(m.id) && !!m.phone);
-    } else if (targetType === 'GROUP_1') {
+    } else if (targetType === 'JOY' || targetType === 'GROUP_1' || targetType === 'JOY_CELL') {
       recipients = await prisma.member.findMany({
-        where: { status: 'ACTIVE', churchGroup: ChurchGroup.GROUP_1, phone: { not: null } }
+        where: { status: 'ACTIVE', churchGroup: ChurchGroup.JOY, phone: { not: null } }
       });
-    } else if (targetType === 'GROUP_2') {
+    } else if (targetType === 'FAITH' || targetType === 'GROUP_2' || targetType === 'FAITH_CELL') {
       recipients = await prisma.member.findMany({
-        where: { status: 'ACTIVE', churchGroup: ChurchGroup.GROUP_2, phone: { not: null } }
+        where: { status: 'ACTIVE', churchGroup: ChurchGroup.FAITH, phone: { not: null } }
+      });
+    } else if (targetType === 'HOPE' || targetType === 'HOPE_CELL') {
+      recipients = await prisma.member.findMany({
+        where: { status: 'ACTIVE', churchGroup: ChurchGroup.HOPE, phone: { not: null } }
+      });
+    } else if (targetType === 'LOVE' || targetType === 'LOVE_CELL') {
+      recipients = await prisma.member.findMany({
+        where: { status: 'ACTIVE', churchGroup: ChurchGroup.LOVE, phone: { not: null } }
       });
     } else if (targetType === 'DEPARTMENT') {
       if (!departmentId) {
@@ -155,13 +166,24 @@ messageRouter.post('/broadcast', async (req: Request, res: Response) => {
     const whatsappLinks: { name: string; phone: string; url: string }[] = [];
     const smsPhones: string[] = [];
 
+    const cellLabel = (grp: ChurchGroup) => {
+      switch (grp) {
+        case ChurchGroup.JOY: return 'Joy Cell';
+        case ChurchGroup.FAITH: return 'Faith Cell';
+        case ChurchGroup.HOPE: return 'Hope Cell';
+        case ChurchGroup.LOVE: return 'Love Cell';
+        default: return 'Cell';
+      }
+    };
+
     for (const recipient of recipients) {
       if (!recipient.phone) continue;
 
       const personalized = defaultMsg
         .replace(/{firstName}/g, recipient.firstName)
         .replace(/{lastName}/g, recipient.lastName)
-        .replace(/{group}/g, recipient.churchGroup === ChurchGroup.GROUP_1 ? 'Group 1' : 'Group 2');
+        .replace(/{group}/g, cellLabel(recipient.churchGroup))
+        .replace(/{cell}/g, cellLabel(recipient.churchGroup));
 
       const log = await prisma.messageLog.create({
         data: {
@@ -192,7 +214,7 @@ messageRouter.post('/broadcast', async (req: Request, res: Response) => {
     if (channel === 'SMS' && smsPhones.length > 0) {
       gatewayResult = await sendVynfySMS({
         recipients: smsPhones,
-        message: defaultMsg.replace(/{firstName}/g, 'Beloved').replace(/{lastName}/g, '').replace(/{group}/g, 'CACI'),
+        message: defaultMsg.replace(/{firstName}/g, 'Beloved').replace(/{lastName}/g, '').replace(/{group}/g, 'CACI').replace(/{cell}/g, 'CACI'),
         senderId: senderId || undefined
       });
     }

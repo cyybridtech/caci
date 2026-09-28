@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import {
   UserCheck,
   Phone,
@@ -28,7 +28,7 @@ export const AssimilationPipeline: React.FC<AssimilationPipelineProps> = ({
     {
       key: 'FIRST_VISIT',
       title: '1. First Sunday Visit',
-      desc: 'Welcomed at the door today',
+      desc: 'Welcomed at church service today',
       color: 'border-blue-500 bg-blue-50/40 text-blue-900'
     },
     {
@@ -45,11 +45,31 @@ export const AssimilationPipeline: React.FC<AssimilationPipelineProps> = ({
     },
     {
       key: 'ASSIGNED_GROUP',
-      title: '4. Integrated (Group 1/2)',
-      desc: 'Fully assimilated member',
+      title: '4. Cell Integrated',
+      desc: 'Assigned to Joy, Faith, Hope, or Love',
       color: 'border-emerald-500 bg-emerald-50/40 text-emerald-900'
     }
   ];
+
+  const getCellBadge = (cell: ChurchGroup) => {
+    switch (cell) {
+      case 'JOY': return 'bg-amber-100 text-amber-800 border-amber-300';
+      case 'FAITH': return 'bg-blue-100 text-blue-800 border-blue-300';
+      case 'HOPE': return 'bg-emerald-100 text-emerald-800 border-emerald-300';
+      case 'LOVE': return 'bg-rose-100 text-rose-800 border-rose-300';
+      default: return 'bg-slate-100 text-slate-800 border-slate-300';
+    }
+  };
+
+  const getCellLabel = (cell: ChurchGroup) => {
+    switch (cell) {
+      case 'JOY': return 'Joy Cell';
+      case 'FAITH': return 'Faith Cell';
+      case 'HOPE': return 'Hope Cell';
+      case 'LOVE': return 'Love Cell';
+      default: return cell;
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -62,7 +82,7 @@ export const AssimilationPipeline: React.FC<AssimilationPipelineProps> = ({
           <div>
             <h2 className="text-lg font-bold text-slate-900">First-Timer & Visitor Assimilation Pipeline</h2>
             <p className="text-xs text-slate-500">
-              Track visitors from their first Sunday to full integration into Group 1 or Group 2
+              Track visitors from their first Sunday to full integration into their assigned church cell (Joy, Faith, Hope, or Love)
             </p>
           </div>
         </div>
@@ -107,13 +127,11 @@ export const AssimilationPipeline: React.FC<AssimilationPipelineProps> = ({
                             {member.firstName} {member.lastName}
                           </h4>
                           <span
-                            className={`px-1.5 py-0.2 rounded text-[9px] font-extrabold uppercase ${
-                              member.churchGroup === 'GROUP_1'
-                                ? 'bg-blue-100 text-blue-800'
-                                : 'bg-purple-100 text-purple-800'
-                            }`}
+                            className={`px-1.5 py-0.2 rounded text-[9px] font-extrabold uppercase border ${getCellBadge(
+                              member.churchGroup
+                            )}`}
                           >
-                            {member.churchGroup === 'GROUP_1' ? 'Group 1' : 'Group 2'}
+                            {getCellLabel(member.churchGroup)}
                           </span>
                         </div>
 
@@ -167,19 +185,31 @@ export const AssimilationPipeline: React.FC<AssimilationPipelineProps> = ({
 
                           {stage.key === 'HOME_VISIT' && (
                             <div className="w-full space-y-1.5">
-                              <div className="text-[10px] font-bold text-slate-500">Assign Final Group:</div>
+                              <div className="text-[10px] font-bold text-slate-500">Assign Final Cell:</div>
                               <div className="grid grid-cols-2 gap-1.5">
                                 <button
-                                  onClick={() => onUpdateStage(member.id, 'ASSIGNED_GROUP', 'GROUP_1')}
-                                  className="py-1 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded text-[10px] transition"
+                                  onClick={() => onUpdateStage(member.id, 'ASSIGNED_GROUP', 'JOY')}
+                                  className="py-1 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold rounded text-[10px] transition"
                                 >
-                                  Group 1
+                                  Joy Cell
                                 </button>
                                 <button
-                                  onClick={() => onUpdateStage(member.id, 'ASSIGNED_GROUP', 'GROUP_2')}
-                                  className="py-1 bg-purple-600 hover:bg-purple-500 text-white font-bold rounded text-[10px] transition"
+                                  onClick={() => onUpdateStage(member.id, 'ASSIGNED_GROUP', 'FAITH')}
+                                  className="py-1 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded text-[10px] transition"
                                 >
-                                  Group 2
+                                  Faith Cell
+                                </button>
+                                <button
+                                  onClick={() => onUpdateStage(member.id, 'ASSIGNED_GROUP', 'HOPE')}
+                                  className="py-1 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded text-[10px] transition"
+                                >
+                                  Hope Cell
+                                </button>
+                                <button
+                                  onClick={() => onUpdateStage(member.id, 'ASSIGNED_GROUP', 'LOVE')}
+                                  className="py-1 bg-rose-600 hover:bg-rose-500 text-white font-bold rounded text-[10px] transition"
+                                >
+                                  Love Cell
                                 </button>
                               </div>
                             </div>

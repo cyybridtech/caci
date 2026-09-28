@@ -1,7 +1,10 @@
 import { Router, Request, Response } from 'express';
 import { prisma } from '../db.js';
+import { requireAuth } from '../middleware/auth.js';
 
 export const departmentRouter = Router();
+
+departmentRouter.use(requireAuth);
 
 // Simple in-memory cache — departments rarely change
 let deptCache: { data: any; expiresAt: number } | null = null;

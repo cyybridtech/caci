@@ -1,8 +1,11 @@
 import { Router, Request, Response } from 'express';
 import { prisma } from '../db.js';
 import { FinancialCategory, PaymentMethod } from '@prisma/client';
+import { requireAuth } from '../middleware/auth.js';
 
 export const syncRouter = Router();
+
+syncRouter.use(requireAuth);
 
 // POST /api/sync - idempotent batch sync for offline-queued data
 syncRouter.post('/', async (req: Request, res: Response) => {

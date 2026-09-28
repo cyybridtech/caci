@@ -42,7 +42,7 @@ export const CheckInDesk: React.FC<CheckInDeskProps> = ({
   isLoading
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
-  const [groupFilter, setGroupFilter] = useState<'ALL' | 'GROUP_1' | 'GROUP_2'>('ALL');
+  const [groupFilter, setGroupFilter] = useState<'ALL' | 'JOY' | 'FAITH' | 'HOPE' | 'LOVE'>('ALL');
   const [statusFilter, setStatusFilter] = useState<'ALL' | 'PRESENT' | 'ABSENT'>('ALL');
   const [selectedDeptId, setSelectedDeptId] = useState<string>('ALL');
   const [soundEnabled, setSoundEnabled] = useState(true);
@@ -56,7 +56,6 @@ export const CheckInDesk: React.FC<CheckInDeskProps> = ({
   // Global hotkeys handler
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Ignore if user is currently typing in an input/textarea
       const isInputActive =
         document.activeElement?.tagName === 'INPUT' ||
         document.activeElement?.tagName === 'TEXTAREA' ||
@@ -68,9 +67,13 @@ export const CheckInDesk: React.FC<CheckInDeskProps> = ({
         searchInputRef.current?.select();
       } else if (!isInputActive) {
         if (e.key === '1') {
-          setGroupFilter('GROUP_1');
+          setGroupFilter('JOY');
         } else if (e.key === '2') {
-          setGroupFilter('GROUP_2');
+          setGroupFilter('FAITH');
+        } else if (e.key === '3') {
+          setGroupFilter('HOPE');
+        } else if (e.key === '4') {
+          setGroupFilter('LOVE');
         } else if (e.key === '0' || e.key === 'a' || e.key === 'A') {
           setGroupFilter('ALL');
         }
@@ -135,96 +138,167 @@ export const CheckInDesk: React.FC<CheckInDeskProps> = ({
     }
   };
 
+  const getCellLabel = (cell: ChurchGroup) => {
+    switch (cell) {
+      case 'JOY': return 'Joy Cell';
+      case 'FAITH': return 'Faith Cell';
+      case 'HOPE': return 'Hope Cell';
+      case 'LOVE': return 'Love Cell';
+      default: return cell;
+    }
+  };
+
+  const getCellBadge = (cell: ChurchGroup) => {
+    switch (cell) {
+      case 'JOY': return 'bg-amber-100 text-amber-900 border-amber-300';
+      case 'FAITH': return 'bg-blue-100 text-blue-800 border-blue-300';
+      case 'HOPE': return 'bg-emerald-100 text-emerald-800 border-emerald-300';
+      case 'LOVE': return 'bg-rose-100 text-rose-800 border-rose-300';
+      default: return 'bg-slate-100 text-slate-800 border-slate-300';
+    }
+  };
+
+  const joyStat = stats?.cells?.JOY || stats?.group1 || { total: 0, present: 0, percentage: 0 };
+  const faithStat = stats?.cells?.FAITH || stats?.group2 || { total: 0, present: 0, percentage: 0 };
+  const hopeStat = stats?.cells?.HOPE || { total: 0, present: 0, percentage: 0 };
+  const loveStat = stats?.cells?.LOVE || { total: 0, present: 0, percentage: 0 };
+
   return (
     <div className="space-y-6">
-      {/* 1. Live Headcount & Group Breakdown Counters */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      {/* 1. Live Headcount & 4 Cells Breakdown */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3.5">
         {/* Total Attendance Card */}
-        <div className="bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white p-5 rounded-3xl shadow-lg border border-slate-700/60 relative overflow-hidden">
+        <div className="bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white p-4 rounded-3xl shadow-lg border border-slate-700/60 relative overflow-hidden">
           <div className="flex items-center justify-between">
-            <span className="text-xs uppercase font-extrabold tracking-wider text-slate-400">
-              Total Attendance Today
+            <span className="text-[11px] uppercase font-extrabold tracking-wider text-slate-400">
+              Total Attendance
             </span>
-            <span className="px-2.5 py-0.5 rounded-full text-xs font-extrabold bg-blue-500/20 text-blue-300 border border-blue-500/40">
-              {stats?.overallPercentage || 0}% Present
+            <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-blue-500/20 text-blue-300 border border-blue-500/40">
+              {stats?.overallPercentage || 0}%
             </span>
           </div>
 
-          <div className="mt-2 flex items-baseline space-x-2">
-            <span className="text-4xl font-extrabold text-white">
+          <div className="mt-2 flex items-baseline space-x-1.5">
+            <span className="text-3xl font-extrabold text-white">
               {stats?.totalPresent || attendanceRecords.length}
             </span>
-            <span className="text-sm text-slate-400 font-semibold">
-              / {stats?.totalMembers || members.length} active members
+            <span className="text-xs text-slate-400 font-semibold">
+              / {stats?.totalMembers || members.length}
             </span>
           </div>
 
-          <div className="mt-3 w-full bg-slate-700/60 rounded-full h-2.5 overflow-hidden">
+          <div className="mt-2.5 w-full bg-slate-700/60 rounded-full h-2 overflow-hidden">
             <div
-              className="bg-gradient-to-r from-blue-500 to-emerald-400 h-2.5 rounded-full transition-all duration-500"
+              className="bg-gradient-to-r from-blue-500 to-emerald-400 h-2 rounded-full transition-all duration-500"
               style={{ width: `${Math.min(100, stats?.overallPercentage || 0)}%` }}
             ></div>
           </div>
         </div>
 
-        {/* Group 1 Card */}
-        <div className="bg-white p-5 rounded-3xl shadow-sm border-2 border-blue-200 hover:shadow-md transition">
+        {/* Joy Cell Card */}
+        <div className="bg-white p-4 rounded-3xl shadow-sm border-2 border-amber-200 hover:shadow-md transition">
           <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-2">
-              <span className="w-3 h-3 rounded-full bg-blue-600"></span>
-              <span className="text-xs uppercase font-extrabold tracking-wider text-blue-900">
-                Group 1 Turnout
+            <div className="flex items-center space-x-1.5">
+              <span className="w-2.5 h-2.5 rounded-full bg-amber-500"></span>
+              <span className="text-[11px] uppercase font-extrabold tracking-wider text-amber-900">
+                Joy Cell
               </span>
             </div>
-            <span className="px-2.5 py-0.5 rounded-full text-xs font-extrabold bg-blue-50 text-blue-700 border border-blue-200">
-              {stats?.group1.percentage || 0}%
+            <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-amber-50 text-amber-800 border border-amber-200">
+              {joyStat.percentage}%
             </span>
           </div>
 
-          <div className="mt-2 flex items-baseline space-x-2">
-            <span className="text-4xl font-extrabold text-blue-700">
-              {stats?.group1.present || 0}
-            </span>
-            <span className="text-sm text-slate-500 font-semibold">
-              / {stats?.group1.total || 0} members
-            </span>
+          <div className="mt-2 flex items-baseline space-x-1.5">
+            <span className="text-3xl font-extrabold text-amber-700">{joyStat.present}</span>
+            <span className="text-xs text-slate-500 font-semibold">/ {joyStat.total}</span>
           </div>
 
-          <div className="mt-3 w-full bg-blue-50 rounded-full h-2.5 overflow-hidden">
+          <div className="mt-2.5 w-full bg-amber-100 rounded-full h-2 overflow-hidden">
             <div
-              className="bg-blue-600 h-2.5 rounded-full transition-all duration-500"
-              style={{ width: `${Math.min(100, stats?.group1.percentage || 0)}%` }}
+              className="bg-amber-500 h-2 rounded-full transition-all duration-500"
+              style={{ width: `${Math.min(100, joyStat.percentage)}%` }}
             ></div>
           </div>
         </div>
 
-        {/* Group 2 Card */}
-        <div className="bg-white p-5 rounded-3xl shadow-sm border-2 border-purple-200 hover:shadow-md transition">
+        {/* Faith Cell Card */}
+        <div className="bg-white p-4 rounded-3xl shadow-sm border-2 border-blue-200 hover:shadow-md transition">
           <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-2">
-              <span className="w-3 h-3 rounded-full bg-purple-600"></span>
-              <span className="text-xs uppercase font-extrabold tracking-wider text-purple-900">
-                Group 2 Turnout
+            <div className="flex items-center space-x-1.5">
+              <span className="w-2.5 h-2.5 rounded-full bg-blue-600"></span>
+              <span className="text-[11px] uppercase font-extrabold tracking-wider text-blue-900">
+                Faith Cell
               </span>
             </div>
-            <span className="px-2.5 py-0.5 rounded-full text-xs font-extrabold bg-purple-50 text-purple-700 border border-purple-200">
-              {stats?.group2.percentage || 0}%
+            <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-blue-50 text-blue-700 border border-blue-200">
+              {faithStat.percentage}%
             </span>
           </div>
 
-          <div className="mt-2 flex items-baseline space-x-2">
-            <span className="text-4xl font-extrabold text-purple-700">
-              {stats?.group2.present || 0}
-            </span>
-            <span className="text-sm text-slate-500 font-semibold">
-              / {stats?.group2.total || 0} members
-            </span>
+          <div className="mt-2 flex items-baseline space-x-1.5">
+            <span className="text-3xl font-extrabold text-blue-700">{faithStat.present}</span>
+            <span className="text-xs text-slate-500 font-semibold">/ {faithStat.total}</span>
           </div>
 
-          <div className="mt-3 w-full bg-purple-50 rounded-full h-2.5 overflow-hidden">
+          <div className="mt-2.5 w-full bg-blue-100 rounded-full h-2 overflow-hidden">
             <div
-              className="bg-purple-600 h-2.5 rounded-full transition-all duration-500"
-              style={{ width: `${Math.min(100, stats?.group2.percentage || 0)}%` }}
+              className="bg-blue-600 h-2.5 rounded-full transition-all duration-500"
+              style={{ width: `${Math.min(100, faithStat.percentage)}%` }}
+            ></div>
+          </div>
+        </div>
+
+        {/* Hope Cell Card */}
+        <div className="bg-white p-4 rounded-3xl shadow-sm border-2 border-emerald-200 hover:shadow-md transition">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-1.5">
+              <span className="w-2.5 h-2.5 rounded-full bg-emerald-600"></span>
+              <span className="text-[11px] uppercase font-extrabold tracking-wider text-emerald-900">
+                Hope Cell
+              </span>
+            </div>
+            <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-50 text-emerald-800 border border-emerald-200">
+              {hopeStat.percentage}%
+            </span>
+          </div>
+
+          <div className="mt-2 flex items-baseline space-x-1.5">
+            <span className="text-3xl font-extrabold text-emerald-700">{hopeStat.present}</span>
+            <span className="text-xs text-slate-500 font-semibold">/ {hopeStat.total}</span>
+          </div>
+
+          <div className="mt-2.5 w-full bg-emerald-100 rounded-full h-2 overflow-hidden">
+            <div
+              className="bg-emerald-600 h-2 rounded-full transition-all duration-500"
+              style={{ width: `${Math.min(100, hopeStat.percentage)}%` }}
+            ></div>
+          </div>
+        </div>
+
+        {/* Love Cell Card */}
+        <div className="bg-white p-4 rounded-3xl shadow-sm border-2 border-rose-200 hover:shadow-md transition">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-1.5">
+              <span className="w-2.5 h-2.5 rounded-full bg-rose-600"></span>
+              <span className="text-[11px] uppercase font-extrabold tracking-wider text-rose-900">
+                Love Cell
+              </span>
+            </div>
+            <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-rose-50 text-rose-800 border border-rose-200">
+              {loveStat.percentage}%
+            </span>
+          </div>
+
+          <div className="mt-2 flex items-baseline space-x-1.5">
+            <span className="text-3xl font-extrabold text-rose-700">{loveStat.present}</span>
+            <span className="text-xs text-slate-500 font-semibold">/ {loveStat.total}</span>
+          </div>
+
+          <div className="mt-2.5 w-full bg-rose-100 rounded-full h-2 overflow-hidden">
+            <div
+              className="bg-rose-600 h-2 rounded-full transition-all duration-500"
+              style={{ width: `${Math.min(100, loveStat.percentage)}%` }}
             ></div>
           </div>
         </div>
@@ -273,8 +347,8 @@ export const CheckInDesk: React.FC<CheckInDeskProps> = ({
 
         {/* Filter Pills */}
         <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
-          {/* Groups Filter Tabs */}
-          <div className="flex items-center space-x-1.5 bg-slate-100 p-1.5 rounded-2xl">
+          {/* Cell Filter Tabs */}
+          <div className="flex flex-wrap items-center gap-1.5 bg-slate-100 p-1.5 rounded-2xl">
             <button
               onClick={() => setGroupFilter('ALL')}
               className={`px-3 py-1.5 rounded-xl text-xs font-extrabold transition ${
@@ -283,31 +357,55 @@ export const CheckInDesk: React.FC<CheckInDeskProps> = ({
                   : 'text-slate-600 hover:text-slate-900'
               }`}
             >
-              All Groups <span className="text-[10px] text-slate-400 font-mono ml-1">[0]</span>
+              All Cells <span className="text-[10px] text-slate-400 font-mono ml-1">[0]</span>
             </button>
             <button
-              onClick={() => setGroupFilter('GROUP_1')}
+              onClick={() => setGroupFilter('JOY')}
               className={`px-3 py-1.5 rounded-xl text-xs font-extrabold flex items-center space-x-1.5 transition ${
-                groupFilter === 'GROUP_1'
+                groupFilter === 'JOY'
+                  ? 'bg-amber-500 text-slate-950 shadow-sm'
+                  : 'text-amber-800 hover:bg-amber-50'
+              }`}
+            >
+              <span className="w-2 h-2 rounded-full bg-amber-500"></span>
+              <span>Joy</span>
+              <span className="text-[10px] font-mono ml-1 text-slate-400">[1]</span>
+            </button>
+            <button
+              onClick={() => setGroupFilter('FAITH')}
+              className={`px-3 py-1.5 rounded-xl text-xs font-extrabold flex items-center space-x-1.5 transition ${
+                groupFilter === 'FAITH'
                   ? 'bg-blue-600 text-white shadow-sm'
                   : 'text-blue-700 hover:bg-blue-50'
               }`}
             >
               <span className="w-2 h-2 rounded-full bg-blue-600"></span>
-              <span>Group 1</span>
-              <span className={`text-[10px] font-mono ml-1 ${groupFilter === 'GROUP_1' ? 'text-blue-200' : 'text-blue-400'}`}>[1]</span>
+              <span>Faith</span>
+              <span className="text-[10px] font-mono ml-1 text-slate-400">[2]</span>
             </button>
             <button
-              onClick={() => setGroupFilter('GROUP_2')}
+              onClick={() => setGroupFilter('HOPE')}
               className={`px-3 py-1.5 rounded-xl text-xs font-extrabold flex items-center space-x-1.5 transition ${
-                groupFilter === 'GROUP_2'
-                  ? 'bg-purple-600 text-white shadow-sm'
-                  : 'text-purple-700 hover:bg-purple-50'
+                groupFilter === 'HOPE'
+                  ? 'bg-emerald-600 text-white shadow-sm'
+                  : 'text-emerald-700 hover:bg-emerald-50'
               }`}
             >
-              <span className="w-2 h-2 rounded-full bg-purple-600"></span>
-              <span>Group 2</span>
-              <span className={`text-[10px] font-mono ml-1 ${groupFilter === 'GROUP_2' ? 'text-purple-200' : 'text-purple-400'}`}>[2]</span>
+              <span className="w-2 h-2 rounded-full bg-emerald-600"></span>
+              <span>Hope</span>
+              <span className="text-[10px] font-mono ml-1 text-slate-400">[3]</span>
+            </button>
+            <button
+              onClick={() => setGroupFilter('LOVE')}
+              className={`px-3 py-1.5 rounded-xl text-xs font-extrabold flex items-center space-x-1.5 transition ${
+                groupFilter === 'LOVE'
+                  ? 'bg-rose-600 text-white shadow-sm'
+                  : 'text-rose-700 hover:bg-rose-50'
+              }`}
+            >
+              <span className="w-2 h-2 rounded-full bg-rose-600"></span>
+              <span>Love</span>
+              <span className="text-[10px] font-mono ml-1 text-slate-400">[4]</span>
             </button>
           </div>
 
@@ -381,7 +479,7 @@ export const CheckInDesk: React.FC<CheckInDeskProps> = ({
               <Users className="w-12 h-12 text-slate-300 mx-auto" />
               <h4 className="text-base font-bold text-slate-800">No member found</h4>
               <p className="text-xs text-slate-500 max-w-sm mx-auto">
-                No congregant matches your current search or filter. Try adjusting your query or selecting another group.
+                No congregant matches your current search or filter. Try adjusting your query or selecting another cell.
               </p>
             </div>
           ) : (
@@ -413,7 +511,13 @@ export const CheckInDesk: React.FC<CheckInDeskProps> = ({
                       ) : (
                         <div
                           className={`w-11 h-11 rounded-2xl flex items-center justify-center font-extrabold text-sm text-white shrink-0 shadow-sm ${
-                            member.churchGroup === 'GROUP_1' ? 'bg-blue-600' : 'bg-purple-600'
+                            member.churchGroup === 'JOY'
+                              ? 'bg-amber-500 text-slate-950'
+                              : member.churchGroup === 'FAITH'
+                              ? 'bg-blue-600 text-white'
+                              : member.churchGroup === 'HOPE'
+                              ? 'bg-emerald-600 text-white'
+                              : 'bg-rose-600 text-white'
                           }`}
                         >
                           {member.firstName[0]}
@@ -427,15 +531,13 @@ export const CheckInDesk: React.FC<CheckInDeskProps> = ({
                             {member.firstName} {member.lastName}
                           </h4>
 
-                          {/* Group Badge */}
+                          {/* Cell Badge */}
                           <span
-                            className={`px-2 py-0.5 rounded-md text-[10px] font-extrabold uppercase tracking-wider shrink-0 ${
-                              member.churchGroup === 'GROUP_1'
-                                ? 'bg-blue-100 text-blue-800'
-                                : 'bg-purple-100 text-purple-800'
-                            }`}
+                            className={`px-2 py-0.5 rounded-md text-[10px] font-extrabold uppercase tracking-wider shrink-0 border ${getCellBadge(
+                              member.churchGroup
+                            )}`}
                           >
-                            {member.churchGroup === 'GROUP_1' ? 'Group 1' : 'Group 2'}
+                            {getCellLabel(member.churchGroup)}
                           </span>
 
                           <span className="font-mono text-[10px] font-bold text-slate-400">
@@ -450,62 +552,38 @@ export const CheckInDesk: React.FC<CheckInDeskProps> = ({
                               <span>{member.phone}</span>
                             </span>
                           ) : (
-                            <span className="text-slate-400 italic text-[11px]">No phone</span>
+                            <span className="text-slate-400 italic">No phone</span>
                           )}
 
-                          {member.role !== 'Member' && (
-                            <span className="text-[10px] font-bold text-slate-700 bg-slate-100 px-1.5 py-0.2 rounded">
-                              {member.role}
-                            </span>
-                          )}
+                          <span>•</span>
+                          <span className="text-slate-600 font-medium">{member.role}</span>
                         </div>
                       </div>
                     </div>
 
-                    {/* Right: Quick Actions & Check-In */}
-                    <div className="shrink-0 flex items-center space-x-2">
-                      {/* Attendance History Button */}
+                    {/* Right: Check-In Action Button */}
+                    <div className="flex items-center space-x-2 shrink-0">
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
                           onViewMemberHistory(member);
                         }}
-                        title="View Attendance History & Audit"
-                        className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition"
+                        title="View Attendance History"
+                        className="p-2 rounded-xl text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition"
                       >
                         <History className="w-4 h-4" />
                       </button>
 
-                      {/* Check-In State */}
                       {isPresent ? (
-                        <div className="flex items-center space-x-2">
-                          <span className="inline-flex items-center space-x-1 px-3 py-1.5 rounded-xl bg-emerald-600 text-white font-extrabold text-xs shadow-sm">
-                            <Check className="w-4 h-4" />
-                            <span>Present</span>
-                          </span>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              onUndoCheckIn(member.id);
-                            }}
-                            title="Undo check-in"
-                            className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition"
-                          >
-                            <Undo2 className="w-4 h-4" />
-                          </button>
+                        <div className="flex items-center space-x-1.5 px-4 py-2 rounded-xl bg-emerald-600 text-white font-extrabold text-xs shadow-sm">
+                          <Check className="w-4 h-4" />
+                          <span>Present</span>
                         </div>
                       ) : (
-                        <button
-                          type="button"
-                          className={`px-4 py-2 rounded-xl font-bold text-xs transition border flex items-center space-x-1.5 ${
-                            isHighlighted
-                              ? 'bg-blue-600 text-white border-blue-700 shadow-md'
-                              : 'bg-slate-100 hover:bg-blue-600 text-slate-700 hover:text-white border-slate-200'
-                          }`}
-                        >
-                          <CheckCircle2 className="w-4 h-4" />
-                          <span>Mark Present</span>
-                        </button>
+                        <div className="flex items-center space-x-1.5 px-4 py-2 rounded-xl bg-slate-100 group-hover:bg-blue-600 group-hover:text-white text-slate-700 font-extrabold text-xs transition">
+                          <span>Check In</span>
+                          <ChevronRight className="w-4 h-4" />
+                        </div>
                       )}
                     </div>
                   </div>
@@ -515,71 +593,51 @@ export const CheckInDesk: React.FC<CheckInDeskProps> = ({
           )}
         </div>
 
-        {/* Right Column: Live Stream */}
-        <div className="bg-white rounded-3xl p-5 border border-slate-200 shadow-sm space-y-4 h-fit">
-          <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-            <div className="flex items-center space-x-2">
-              <Clock className="w-4 h-4 text-blue-600" />
-              <h3 className="font-bold text-sm text-slate-900">Live Check-In Stream</h3>
+        {/* Right Column: Live Feed of Recent Check-Ins */}
+        <div className="space-y-4">
+          <div className="bg-white p-5 rounded-3xl shadow-sm border border-slate-200">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <h3 className="text-sm font-extrabold text-slate-900 flex items-center space-x-2">
+                <Clock className="w-4 h-4 text-blue-600" />
+                <span>Live Feed ({attendanceRecords.length})</span>
+              </h3>
             </div>
-            <span className="text-[11px] font-extrabold px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
-              {attendanceRecords.length} recorded
-            </span>
-          </div>
 
-          {attendanceRecords.length === 0 ? (
-            <div className="py-12 text-center text-slate-400 space-y-2">
-              <Clock className="w-8 h-8 mx-auto text-slate-300 stroke-[1.5]" />
-              <p className="text-xs font-semibold">No check-ins yet for this service.</p>
-              <p className="text-[11px] text-slate-400">
-                As members arrive, click "Mark Present" or press Enter on the highlighted congregant.
-              </p>
-            </div>
-          ) : (
-            <div className="space-y-3 max-h-[520px] overflow-y-auto pr-1">
-              {attendanceRecords.map((record) => (
-                <div
-                  key={record.id}
-                  className="p-3 rounded-2xl bg-slate-50 border border-slate-200/80 flex items-center justify-between gap-2 group hover:bg-slate-100 transition"
-                >
-                  <div className="min-w-0">
-                    <div className="flex items-center space-x-1.5">
-                      <span className="font-bold text-xs text-slate-900 truncate">
-                        {record.member.firstName} {record.member.lastName}
-                      </span>
-                      <span
-                        className={`text-[9px] font-extrabold px-1.5 py-0.2 rounded ${
-                          record.member.churchGroup === 'GROUP_1'
-                            ? 'bg-blue-100 text-blue-800'
-                            : 'bg-purple-100 text-purple-800'
-                        }`}
-                      >
-                        {record.member.churchGroup === 'GROUP_1' ? 'G1' : 'G2'}
-                      </span>
+            {attendanceRecords.length === 0 ? (
+              <div className="text-center py-10 space-y-2">
+                <Sparkles className="w-8 h-8 text-slate-300 mx-auto" />
+                <p className="text-xs text-slate-400">Waiting for congregants to check in...</p>
+              </div>
+            ) : (
+              <div className="divide-y divide-slate-100 max-h-[550px] overflow-y-auto mt-2">
+                {attendanceRecords.map((record) => (
+                  <div key={record.id} className="py-3 flex items-center justify-between">
+                    <div className="flex items-center space-x-2.5 min-w-0">
+                      <div className="w-8 h-8 rounded-xl bg-emerald-100 text-emerald-800 font-extrabold text-xs flex items-center justify-center shrink-0">
+                        {record.member.firstName[0]}
+                      </div>
+                      <div className="min-w-0">
+                        <h5 className="text-xs font-extrabold text-slate-900 truncate">
+                          {record.member.firstName} {record.member.lastName}
+                        </h5>
+                        <p className="text-[10px] text-slate-400">
+                          {new Date(record.checkInTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} • {getCellLabel(record.member.churchGroup)}
+                        </p>
+                      </div>
                     </div>
-                    <span className="text-[10px] text-slate-400 flex items-center space-x-1 mt-0.5 font-medium">
-                      <span>
-                        {new Date(record.checkInTime).toLocaleTimeString([], {
-                          hour: '2-digit',
-                          minute: '2-digit',
-                          second: '2-digit'
-                        })}
-                      </span>
-                      <span>• {record.markedBy}</span>
-                    </span>
-                  </div>
 
-                  <button
-                    onClick={() => onUndoCheckIn(record.memberId)}
-                    title="Undo this check-in"
-                    className="opacity-0 group-hover:opacity-100 text-slate-400 hover:text-red-600 p-1.5 rounded-lg hover:bg-white transition"
-                  >
-                    <Undo2 className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-              ))}
-            </div>
-          )}
+                    <button
+                      onClick={() => onUndoCheckIn(record.member.id)}
+                      title="Undo check in"
+                      className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition"
+                    >
+                      <Undo2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </div>

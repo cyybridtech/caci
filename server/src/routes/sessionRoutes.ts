@@ -1,7 +1,10 @@
 import { Router, Request, Response } from 'express';
 import { prisma } from '../db.js';
+import { requireAuth, requireRole } from '../middleware/auth.js';
 
 export const sessionRouter = Router();
+
+sessionRouter.use(requireAuth);
 
 // GET /api/sessions/active - get latest or today's active session
 sessionRouter.get('/active', async (req: Request, res: Response) => {

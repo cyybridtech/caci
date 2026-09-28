@@ -1,6 +1,7 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App.tsx';
+import { AuthProvider } from './context/AuthContext.tsx';
 import './index.css';
 
 // Register Service Worker for PWA offline caching if available in production
@@ -14,6 +15,8 @@ if ('serviceWorker' in navigator && import.meta.env.PROD) {
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
-    <App />
+    <AuthProvider>
+      <App />
+    </AuthProvider>
   </React.StrictMode>
 );

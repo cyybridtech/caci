@@ -8,7 +8,7 @@ import {
   ChevronRight,
   Filter
 } from 'lucide-react';
-import { Member } from '../types/index.ts';
+import { Member, ChurchGroup } from '../types/index.ts';
 
 interface AttendanceAuditViewProps {
   members: Member[];
@@ -20,7 +20,7 @@ export const AttendanceAuditView: React.FC<AttendanceAuditViewProps> = ({
   onInspectMemberHistory
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
-  const [groupFilter, setGroupFilter] = useState<'ALL' | 'GROUP_1' | 'GROUP_2'>('ALL');
+  const [groupFilter, setGroupFilter] = useState<'ALL' | 'JOY' | 'FAITH' | 'HOPE' | 'LOVE'>('ALL');
 
   const filteredMembers = members.filter((m) => {
     if (groupFilter !== 'ALL' && m.churchGroup !== groupFilter) return false;
@@ -35,6 +35,26 @@ export const AttendanceAuditView: React.FC<AttendanceAuditViewProps> = ({
     return true;
   });
 
+  const getCellLabel = (cell: ChurchGroup) => {
+    switch (cell) {
+      case 'JOY': return 'Joy Cell';
+      case 'FAITH': return 'Faith Cell';
+      case 'HOPE': return 'Hope Cell';
+      case 'LOVE': return 'Love Cell';
+      default: return cell;
+    }
+  };
+
+  const getCellBadge = (cell: ChurchGroup) => {
+    switch (cell) {
+      case 'JOY': return 'bg-amber-100 text-amber-900 border-amber-300';
+      case 'FAITH': return 'bg-blue-100 text-blue-800 border-blue-300';
+      case 'HOPE': return 'bg-emerald-100 text-emerald-800 border-emerald-300';
+      case 'LOVE': return 'bg-rose-100 text-rose-800 border-rose-300';
+      default: return 'bg-slate-100 text-slate-800 border-slate-300';
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Top Banner */}
@@ -48,13 +68,13 @@ export const AttendanceAuditView: React.FC<AttendanceAuditViewProps> = ({
               Member Attendance Audit & History Search
             </h2>
             <p className="text-xs text-slate-500">
-              Search any congregant to inspect their attendance percentage, attended dates, and history
+              Search any congregant across Joy, Faith, Hope, and Love cells to inspect attendance records
             </p>
           </div>
         </div>
       </div>
 
-      {/* Search & Group Filter Bar */}
+      {/* Search & Cell Filter Bar */}
       <div className="bg-white p-5 rounded-3xl border border-slate-200 shadow-sm flex flex-wrap items-center justify-between gap-4">
         <div className="relative flex-1 min-w-[260px]">
           <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-3.5" />
@@ -67,31 +87,47 @@ export const AttendanceAuditView: React.FC<AttendanceAuditViewProps> = ({
           />
         </div>
 
-        {/* Group Filter */}
-        <div className="flex items-center space-x-1.5 bg-slate-100 p-1.5 rounded-2xl">
+        {/* Cell Filter */}
+        <div className="flex flex-wrap items-center gap-1.5 bg-slate-100 p-1.5 rounded-2xl">
           <button
             onClick={() => setGroupFilter('ALL')}
             className={`px-3 py-1.5 rounded-xl text-xs font-bold transition ${
-              groupFilter === 'ALL' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600'
+              groupFilter === 'ALL' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600 hover:text-slate-900'
             }`}
           >
-            All Groups ({members.length})
+            All Cells ({members.length})
           </button>
           <button
-            onClick={() => setGroupFilter('GROUP_1')}
+            onClick={() => setGroupFilter('JOY')}
             className={`px-3 py-1.5 rounded-xl text-xs font-bold transition ${
-              groupFilter === 'GROUP_1' ? 'bg-blue-600 text-white shadow-sm' : 'text-blue-700'
+              groupFilter === 'JOY' ? 'bg-amber-500 text-slate-950 shadow-sm' : 'text-amber-800 hover:bg-amber-100/50'
             }`}
           >
-            Group 1 ({members.filter((m) => m.churchGroup === 'GROUP_1').length})
+            Joy ({members.filter((m) => m.churchGroup === 'JOY').length})
           </button>
           <button
-            onClick={() => setGroupFilter('GROUP_2')}
+            onClick={() => setGroupFilter('FAITH')}
             className={`px-3 py-1.5 rounded-xl text-xs font-bold transition ${
-              groupFilter === 'GROUP_2' ? 'bg-purple-600 text-white shadow-sm' : 'text-purple-700'
+              groupFilter === 'FAITH' ? 'bg-blue-600 text-white shadow-sm' : 'text-blue-800 hover:bg-blue-100/50'
             }`}
           >
-            Group 2 ({members.filter((m) => m.churchGroup === 'GROUP_2').length})
+            Faith ({members.filter((m) => m.churchGroup === 'FAITH').length})
+          </button>
+          <button
+            onClick={() => setGroupFilter('HOPE')}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition ${
+              groupFilter === 'HOPE' ? 'bg-emerald-600 text-white shadow-sm' : 'text-emerald-800 hover:bg-emerald-100/50'
+            }`}
+          >
+            Hope ({members.filter((m) => m.churchGroup === 'HOPE').length})
+          </button>
+          <button
+            onClick={() => setGroupFilter('LOVE')}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition ${
+              groupFilter === 'LOVE' ? 'bg-rose-600 text-white shadow-sm' : 'text-rose-800 hover:bg-rose-100/50'
+            }`}
+          >
+            Love ({members.filter((m) => m.churchGroup === 'LOVE').length})
           </button>
         </div>
       </div>
@@ -119,7 +155,13 @@ export const AttendanceAuditView: React.FC<AttendanceAuditViewProps> = ({
                     ) : (
                       <div
                         className={`w-11 h-11 rounded-2xl flex items-center justify-center font-extrabold text-sm text-white shadow-sm shrink-0 ${
-                          member.churchGroup === 'GROUP_1' ? 'bg-blue-600' : 'bg-purple-600'
+                          member.churchGroup === 'JOY'
+                            ? 'bg-amber-500 text-slate-950'
+                            : member.churchGroup === 'FAITH'
+                            ? 'bg-blue-600 text-white'
+                            : member.churchGroup === 'HOPE'
+                            ? 'bg-emerald-600 text-white'
+                            : 'bg-rose-600 text-white'
                         }`}
                       >
                         {member.firstName[0]}
@@ -132,13 +174,11 @@ export const AttendanceAuditView: React.FC<AttendanceAuditViewProps> = ({
                       </h4>
                       <div className="flex items-center space-x-2 mt-0.5">
                         <span
-                          className={`px-2 py-0.2 rounded text-[10px] font-extrabold uppercase ${
-                            member.churchGroup === 'GROUP_1'
-                              ? 'bg-blue-100 text-blue-800'
-                              : 'bg-purple-100 text-purple-800'
-                          }`}
+                          className={`px-2 py-0.5 rounded text-[10px] font-extrabold uppercase border ${getCellBadge(
+                            member.churchGroup
+                          )}`}
                         >
-                          {member.churchGroup === 'GROUP_1' ? 'Group 1' : 'Group 2'}
+                          {getCellLabel(member.churchGroup)}
                         </span>
                         <span className="font-mono text-[10px] font-bold text-slate-400">
                           {member.memberCode || 'CACI-000'}

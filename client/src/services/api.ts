@@ -12,12 +12,102 @@ import {
   Celebrant,
   PledgeCampaign,
   MemberPledge,
-  PledgePayment
+  PledgePayment,
+  AuthUser,
+  SystemUser,
+  UserRole,
+  ChurchGroup
 } from '../types/index.ts';
 
 const BASE_URL = (import.meta.env.VITE_API_URL as string) || '/api';
 
+const getAuthHeaders = (): HeadersInit => {
+  const token = localStorage.getItem('caci_token');
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+  };
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+  return headers;
+};
+
 export const api = {
+  // Authentication
+  async login(username: string, password: string): Promise<{ token: string; user: AuthUser }> {
+    const res = await fetch(`${BASE_URL}/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, password })
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: 'Login failed' }));
+      throw new Error(err.error || 'Login failed');
+    }
+    return res.json();
+  },
+
+  async changePassword(currentPassword: string, newPassword: string): Promise<{ success: boolean; message: string }> {
+    const res = await fetch(`${BASE_URL}/auth/change-password`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ currentPassword, newPassword })
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: 'Failed to change password' }));
+      throw new Error(err.error || 'Failed to change password');
+    }
+    return res.json();
+  },
+
+  async getMe(): Promise<AuthUser> {
+    const res = await fetch(`${BASE_URL}/auth/me`, {
+      headers: getAuthHeaders()
+    });
+    if (!res.ok) throw new Error('Failed to fetch user session');
+    return res.json();
+  },
+
+  // User Management
+  async getUsers(): Promise<SystemUser[]> {
+    const res = await fetch(`${BASE_URL}/users`, {
+      headers: getAuthHeaders()
+    });
+    if (!res.ok) throw new Error('Failed to fetch system users');
+    return res.json();
+  },
+
+  async createUser(data: { username: string; role: UserRole; cell?: ChurchGroup }): Promise<SystemUser> {
+    const res = await fetch(`${BASE_URL}/users`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify(data)
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: 'Failed to create user' }));
+      throw new Error(err.error || 'Failed to create user');
+    }
+    return res.json();
+  },
+
+  async deleteUser(id: string): Promise<{ success: boolean }> {
+    const res = await fetch(`${BASE_URL}/users/${id}`, {
+      method: 'DELETE',
+      headers: getAuthHeaders()
+    });
+    if (!res.ok) throw new Error('Failed to delete user');
+    return res.json();
+  },
+
+  async resetUserPassword(id: string): Promise<{ success: boolean }> {
+    const res = await fetch(`${BASE_URL}/users/${id}/reset-password`, {
+      method: 'PATCH',
+      headers: getAuthHeaders()
+    });
+    if (!res.ok) throw new Error('Failed to reset password');
+    return res.json();
+  },
+
   // Members
   async getMembers(params?: { search?: string; group?: string; departmentId?: string; status?: string; stage?: string }): Promise<Member[]> {
     const query = new URLSearchParams();
@@ -27,19 +117,25 @@ export const api = {
     if (params?.status && params.status !== 'ALL') query.append('status', params.status);
     if (params?.stage && params.stage !== 'ALL') query.append('stage', params.stage);
 
-    const res = await fetch(`${BASE_URL}/members?${query.toString()}`);
+    const res = await fetch(`${BASE_URL}/members?${query.toString()}`, {
+      headers: getAuthHeaders()
+    });
     if (!res.ok) throw new Error('Failed to fetch members');
     return res.json();
   },
 
   async getMember(id: string): Promise<Member> {
-    const res = await fetch(`${BASE_URL}/members/${id}`);
+    const res = await fetch(`${BASE_URL}/members/${id}`, {
+      headers: getAuthHeaders()
+    });
     if (!res.ok) throw new Error('Failed to fetch member details');
     return res.json();
   },
 
   async lookupMemberByQr(qrCode: string): Promise<Member> {
-    const res = await fetch(`${BASE_URL}/members/qr/${encodeURIComponent(qrCode)}`);
+    const res = await fetch(`${BASE_URL}/members/qr/${encodeURIComponent(qrCode)}`, {
+      headers: getAuthHeaders()
+    });
     if (!res.ok) {
       const err = await res.json().catch(() => ({ error: 'Member not found' }));
       throw new Error(err.error || 'Member not found');
@@ -48,7 +144,9 @@ export const api = {
   },
 
   async getMemberAttendanceHistory(memberId: string): Promise<MemberAttendanceHistory> {
-    const res = await fetch(`${BASE_URL}/members/${memberId}/attendance-history`);
+    const res = await fetch(`${BASE_URL}/members/${memberId}/attendance-history`, {
+      headers: getAuthHeaders()
+    });
     if (!res.ok) throw new Error('Failed to fetch member attendance records');
     return res.json();
   },
@@ -56,7 +154,7 @@ export const api = {
   async updateAssimilationStage(memberId: string, stage: string, group?: string): Promise<Member> {
     const res = await fetch(`${BASE_URL}/members/${memberId}/assimilation`, {
       method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getAuthHeaders(),
       body: JSON.stringify({ assimilationStage: stage, churchGroup: group })
     });
     if (!res.ok) throw new Error('Failed to update assimilation stage');
@@ -66,17 +164,20 @@ export const api = {
   async createMember(data: any): Promise<Member> {
     const res = await fetch(`${BASE_URL}/members`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getAuthHeaders(),
       body: JSON.stringify(data)
     });
-    if (!res.ok) throw new Error('Failed to create member');
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: 'Failed to create member' }));
+      throw new Error(err.message || err.error || 'Failed to create member');
+    }
     return res.json();
   },
 
   async updateMember(id: string, data: any): Promise<Member> {
     const res = await fetch(`${BASE_URL}/members/${id}`, {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getAuthHeaders(),
       body: JSON.stringify(data)
     });
     if (!res.ok) throw new Error('Failed to update member');
@@ -85,7 +186,8 @@ export const api = {
 
   async deleteMember(id: string): Promise<{ success: boolean }> {
     const res = await fetch(`${BASE_URL}/members/${id}`, {
-      method: 'DELETE'
+      method: 'DELETE',
+      headers: getAuthHeaders()
     });
     if (!res.ok) throw new Error('Failed to delete member');
     return res.json();
@@ -93,7 +195,9 @@ export const api = {
 
   // Departments
   async getDepartments(): Promise<Department[]> {
-    const res = await fetch(`${BASE_URL}/departments`);
+    const res = await fetch(`${BASE_URL}/departments`, {
+      headers: getAuthHeaders()
+    });
     if (!res.ok) throw new Error('Failed to fetch departments');
     return res.json();
   },
@@ -101,7 +205,7 @@ export const api = {
   async createDepartment(data: { name: string; description?: string; leaderName?: string }): Promise<Department> {
     const res = await fetch(`${BASE_URL}/departments`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getAuthHeaders(),
       body: JSON.stringify(data)
     });
     if (!res.ok) throw new Error('Failed to create department');
@@ -110,7 +214,9 @@ export const api = {
 
   // Sessions & Date Selection
   async getActiveSession(): Promise<ServiceSession> {
-    const res = await fetch(`${BASE_URL}/sessions/active`);
+    const res = await fetch(`${BASE_URL}/sessions/active`, {
+      headers: getAuthHeaders()
+    });
     if (!res.ok) throw new Error('Failed to fetch active session');
     return res.json();
   },
@@ -120,13 +226,17 @@ export const api = {
     if (createIfNotFound) query.append('createIfNotFound', 'true');
     if (serviceType) query.append('serviceType', serviceType);
 
-    const res = await fetch(`${BASE_URL}/sessions/by-date?${query.toString()}`);
+    const res = await fetch(`${BASE_URL}/sessions/by-date?${query.toString()}`, {
+      headers: getAuthHeaders()
+    });
     if (!res.ok) throw new Error('Failed to fetch session for chosen date');
     return res.json();
   },
 
   async getSessions(): Promise<ServiceSession[]> {
-    const res = await fetch(`${BASE_URL}/sessions`);
+    const res = await fetch(`${BASE_URL}/sessions`, {
+      headers: getAuthHeaders()
+    });
     if (!res.ok) throw new Error('Failed to fetch sessions');
     return res.json();
   },
@@ -134,7 +244,7 @@ export const api = {
   async createSession(data: { serviceDate?: string; serviceType: string; theme?: string; notes?: string }): Promise<ServiceSession> {
     const res = await fetch(`${BASE_URL}/sessions`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getAuthHeaders(),
       body: JSON.stringify(data)
     });
     if (!res.ok) throw new Error('Failed to create session');
@@ -143,7 +253,9 @@ export const api = {
 
   // Attendance & Analytics
   async getSessionAttendance(sessionId: string): Promise<AttendanceRecord[]> {
-    const res = await fetch(`${BASE_URL}/attendance/session/${sessionId}`);
+    const res = await fetch(`${BASE_URL}/attendance/session/${sessionId}`, {
+      headers: getAuthHeaders()
+    });
     if (!res.ok) throw new Error('Failed to fetch session attendance');
     return res.json();
   },
@@ -151,7 +263,7 @@ export const api = {
   async checkIn(sessionId: string, memberId: string, markedBy?: string): Promise<{ message: string; record: AttendanceRecord; alreadyCheckedIn: boolean }> {
     const res = await fetch(`${BASE_URL}/attendance/check-in`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getAuthHeaders(),
       body: JSON.stringify({ sessionId, memberId, markedBy })
     });
     if (!res.ok) throw new Error('Failed to record attendance');
@@ -161,7 +273,7 @@ export const api = {
   async undoCheckIn(sessionId: string, memberId: string): Promise<{ success: boolean }> {
     const res = await fetch(`${BASE_URL}/attendance/undo`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getAuthHeaders(),
       body: JSON.stringify({ sessionId, memberId })
     });
     if (!res.ok) throw new Error('Failed to undo attendance');
@@ -169,13 +281,17 @@ export const api = {
   },
 
   async getAttendanceStats(sessionId: string): Promise<AttendanceStats> {
-    const res = await fetch(`${BASE_URL}/attendance/stats/${sessionId}`);
+    const res = await fetch(`${BASE_URL}/attendance/stats/${sessionId}`, {
+      headers: getAuthHeaders()
+    });
     if (!res.ok) throw new Error('Failed to fetch attendance stats');
     return res.json();
   },
 
   async getAnalytics(): Promise<AnalyticsData> {
-    const res = await fetch(`${BASE_URL}/attendance/analytics`);
+    const res = await fetch(`${BASE_URL}/attendance/analytics`, {
+      headers: getAuthHeaders()
+    });
     if (!res.ok) throw new Error('Failed to fetch analytics');
     return res.json();
   },
@@ -187,7 +303,9 @@ export const api = {
     if (params?.sessionId) query.append('sessionId', params.sessionId);
     if (params?.memberId) query.append('memberId', params.memberId);
 
-    const res = await fetch(`${BASE_URL}/finances?${query.toString()}`);
+    const res = await fetch(`${BASE_URL}/finances?${query.toString()}`, {
+      headers: getAuthHeaders()
+    });
     if (!res.ok) throw new Error('Failed to fetch finances');
     return res.json();
   },
@@ -195,7 +313,7 @@ export const api = {
   async recordContribution(data: any): Promise<FinancialContribution> {
     const res = await fetch(`${BASE_URL}/finances`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getAuthHeaders(),
       body: JSON.stringify(data)
     });
     if (!res.ok) throw new Error('Failed to record contribution');
@@ -203,20 +321,26 @@ export const api = {
   },
 
   async getFinancialSummary(): Promise<FinancialSummary> {
-    const res = await fetch(`${BASE_URL}/finances/summary`);
+    const res = await fetch(`${BASE_URL}/finances/summary`, {
+      headers: getAuthHeaders()
+    });
     if (!res.ok) throw new Error('Failed to fetch financial summary');
     return res.json();
   },
 
   async getMemberGivingStatement(memberId: string): Promise<any> {
-    const res = await fetch(`${BASE_URL}/finances/member/${memberId}`);
+    const res = await fetch(`${BASE_URL}/finances/member/${memberId}`, {
+      headers: getAuthHeaders()
+    });
     if (!res.ok) throw new Error('Failed to fetch member giving statement');
     return res.json();
   },
 
   // Messaging
   async getMessageLogs(): Promise<MessageLog[]> {
-    const res = await fetch(`${BASE_URL}/messages`);
+    const res = await fetch(`${BASE_URL}/messages`, {
+      headers: getAuthHeaders()
+    });
     if (!res.ok) throw new Error('Failed to fetch message logs');
     return res.json();
   },
@@ -232,7 +356,7 @@ export const api = {
   }): Promise<{ success: boolean; sentCount: number; whatsappLinks?: { name: string; phone: string; url: string }[]; message: string; gateway?: any }> {
     const res = await fetch(`${BASE_URL}/messages/broadcast`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getAuthHeaders(),
       body: JSON.stringify(data)
     });
     if (!res.ok) {
@@ -252,7 +376,7 @@ export const api = {
   }): Promise<{ success: boolean; log: MessageLog; whatsappUrl: string; gateway?: any }> {
     const res = await fetch(`${BASE_URL}/messages/send`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getAuthHeaders(),
       body: JSON.stringify(data)
     });
     if (!res.ok) throw new Error('Failed to send message');
@@ -261,13 +385,17 @@ export const api = {
 
   // Celebrations & Automated SMS
   async getTodayCelebrants(): Promise<Celebrant[]> {
-    const res = await fetch(`${BASE_URL}/celebrations/today`);
+    const res = await fetch(`${BASE_URL}/celebrations/today`, {
+      headers: getAuthHeaders()
+    });
     if (!res.ok) throw new Error('Failed to fetch today celebrants');
     return res.json();
   },
 
   async getUpcomingCelebrants(days = 7): Promise<Celebrant[]> {
-    const res = await fetch(`${BASE_URL}/celebrations/upcoming?days=${days}`);
+    const res = await fetch(`${BASE_URL}/celebrations/upcoming?days=${days}`, {
+      headers: getAuthHeaders()
+    });
     if (!res.ok) throw new Error('Failed to fetch upcoming celebrants');
     return res.json();
   },
@@ -280,7 +408,7 @@ export const api = {
   }): Promise<{ success: boolean; message: string; result: any }> {
     const res = await fetch(`${BASE_URL}/celebrations/dispatch`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getAuthHeaders(),
       body: JSON.stringify(data)
     });
     if (!res.ok) throw new Error('Failed to dispatch celebration blessings');
@@ -289,13 +417,17 @@ export const api = {
 
   // Campaigns & Pledges
   async getCampaigns(): Promise<PledgeCampaign[]> {
-    const res = await fetch(`${BASE_URL}/campaigns`);
+    const res = await fetch(`${BASE_URL}/campaigns`, {
+      headers: getAuthHeaders()
+    });
     if (!res.ok) throw new Error('Failed to fetch campaigns');
     return res.json();
   },
 
   async getCampaign(id: string): Promise<PledgeCampaign> {
-    const res = await fetch(`${BASE_URL}/campaigns/${id}`);
+    const res = await fetch(`${BASE_URL}/campaigns/${id}`, {
+      headers: getAuthHeaders()
+    });
     if (!res.ok) throw new Error('Failed to fetch campaign details');
     return res.json();
   },
@@ -310,7 +442,7 @@ export const api = {
   }): Promise<PledgeCampaign> {
     const res = await fetch(`${BASE_URL}/campaigns`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getAuthHeaders(),
       body: JSON.stringify(data)
     });
     if (!res.ok) throw new Error('Failed to create campaign');
@@ -327,7 +459,7 @@ export const api = {
   }): Promise<MemberPledge> {
     const res = await fetch(`${BASE_URL}/campaigns/${campaignId}/pledges`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getAuthHeaders(),
       body: JSON.stringify(data)
     });
     if (!res.ok) throw new Error('Failed to record pledge');
@@ -342,7 +474,7 @@ export const api = {
   }): Promise<{ success: boolean; payment: PledgePayment; updatedPledge: MemberPledge; receiptNumber: string }> {
     const res = await fetch(`${BASE_URL}/campaigns/pledges/${pledgeId}/payments`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getAuthHeaders(),
       body: JSON.stringify(data)
     });
     if (!res.ok) throw new Error('Failed to record pledge payment');
@@ -355,7 +487,7 @@ export const api = {
   }): Promise<{ success: boolean; remindedCount: number; message: string; results: any[] }> {
     const res = await fetch(`${BASE_URL}/campaigns/${campaignId}/remind-sms`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getAuthHeaders(),
       body: JSON.stringify(data)
     });
     if (!res.ok) throw new Error('Failed to dispatch pledge reminders');
@@ -369,7 +501,7 @@ export const api = {
   }): Promise<{ success: boolean; syncedAttendanceCount: number; syncedContributionCount: number; message: string }> {
     const res = await fetch(`${BASE_URL}/sync`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getAuthHeaders(),
       body: JSON.stringify(data)
     });
     if (!res.ok) throw new Error('Failed to sync offline data');

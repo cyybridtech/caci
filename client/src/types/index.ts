@@ -1,7 +1,26 @@
-export type ChurchGroup = 'GROUP_1' | 'GROUP_2';
+export type ChurchGroup = 'JOY' | 'FAITH' | 'HOPE' | 'LOVE';
 export type MemberStatus = 'ACTIVE' | 'INACTIVE';
 export type Gender = 'MALE' | 'FEMALE' | 'OTHER';
 export type MaritalStatus = 'SINGLE' | 'MARRIED' | 'WIDOWED' | 'DIVORCED';
+
+export type UserRole = 'ADMIN' | 'CELL_LEADER' | 'MEDIA_TEAM' | 'FINANCE';
+
+export interface AuthUser {
+  id: string;
+  username: string;
+  role: UserRole;
+  cell?: ChurchGroup;
+  mustChangePassword: boolean;
+}
+
+export interface SystemUser {
+  id: string;
+  username: string;
+  role: UserRole;
+  cell?: ChurchGroup;
+  mustChangePassword: boolean;
+  createdAt: string;
+}
 
 export type FinancialCategory =
   | 'TITHE'
@@ -60,11 +79,15 @@ export interface Member {
   isHolyGhostBaptized?: boolean;
   notes: string | null;
   departments?: { departmentId: string; department?: Department }[];
+  attendance?: AttendanceRecord[];
+  contributions?: FinancialContribution[];
+  pledges?: MemberPledge[];
   createdAt: string;
   updatedAt: string;
   _count?: {
     attendance: number;
     contributions: number;
+    pledges?: number;
   };
 }
 
@@ -91,23 +114,26 @@ export interface AttendanceRecord {
   session?: ServiceSession;
 }
 
+export interface CellStat {
+  total: number;
+  present: number;
+  absent: number;
+  percentage: number;
+}
+
 export interface AttendanceStats {
   totalMembers: number;
   totalPresent: number;
   totalAbsent: number;
   overallPercentage: number;
-  group1: {
-    total: number;
-    present: number;
-    absent: number;
-    percentage: number;
+  cells: {
+    JOY: CellStat;
+    FAITH: CellStat;
+    HOPE: CellStat;
+    LOVE: CellStat;
   };
-  group2: {
-    total: number;
-    present: number;
-    absent: number;
-    percentage: number;
-  };
+  group1?: CellStat;
+  group2?: CellStat;
 }
 
 export interface MemberAttendanceHistory {
@@ -140,6 +166,12 @@ export interface AnalyticsData {
   totalMembers: number;
   group1Total: number;
   group2Total: number;
+  cellTotals?: {
+    JOY: number;
+    FAITH: number;
+    HOPE: number;
+    LOVE: number;
+  };
   serviceGrowth?: {
     latestCount: number;
     priorCount: number;
@@ -153,8 +185,12 @@ export interface AnalyticsData {
     formattedDate: string;
     serviceType: string;
     totalPresent: number;
-    group1Present: number;
-    group2Present: number;
+    group1Present?: number;
+    group2Present?: number;
+    joyPresent?: number;
+    faithPresent?: number;
+    hopePresent?: number;
+    lovePresent?: number;
     turnoutPercentage: number;
     netChange?: number;
     percentChange?: number;
@@ -166,8 +202,12 @@ export interface AnalyticsData {
     servicesCount: number;
     totalPresent: number;
     avgPresent: number;
-    avgGroup1Present: number;
-    avgGroup2Present: number;
+    avgGroup1Present?: number;
+    avgGroup2Present?: number;
+    avgJoyPresent?: number;
+    avgFaithPresent?: number;
+    avgHopePresent?: number;
+    avgLovePresent?: number;
     uniqueAttendeesCount: number;
     turnoutPercentage: number;
     netChange?: number;
@@ -220,6 +260,13 @@ export interface FinancialContribution {
 export interface FinancialSummary {
   totalAmount: number;
   categoryTotals: Record<FinancialCategory, number>;
+  cellComparison?: {
+    JOY: number;
+    FAITH: number;
+    HOPE: number;
+    LOVE: number;
+    generalOfferings: number;
+  };
   groupComparison: {
     group1: number;
     group2: number;
@@ -277,6 +324,7 @@ export interface MemberPledge {
   createdAt: string;
   updatedAt: string;
   member?: Member | null;
+  campaign?: PledgeCampaign;
   payments?: PledgePayment[];
 }
 

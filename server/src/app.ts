@@ -11,6 +11,8 @@ import { messageRouter } from './routes/messageRoutes.js';
 import { syncRouter } from './routes/syncRoutes.js';
 import { celebrationRouter } from './routes/celebrationRoutes.js';
 import { campaignRouter } from './routes/campaignRoutes.js';
+import { authRouter } from './routes/authRoutes.js';
+import { userRouter } from './routes/userRoutes.js';
 import { prisma } from './db.js';
 
 dotenv.config();
@@ -62,6 +64,8 @@ app.get('/api/health/db', async (_req: Request, res: Response) => {
 });
 
 // Mount Routes
+app.use('/api/auth', authRouter);
+app.use('/api/users', userRouter);
 app.use('/api/members', memberRouter);
 app.use('/api/departments', departmentRouter);
 app.use('/api/sessions', sessionRouter);

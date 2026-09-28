@@ -4,8 +4,11 @@ import {
   getUpcomingCelebrants,
   dispatchCelebrationBlessings
 } from '../services/celebrationService.js';
+import { requireAuth } from '../middleware/auth.js';
 
 export const celebrationRouter = Router();
+
+celebrationRouter.use(requireAuth);
 
 // GET /api/celebrations/today - list today's celebrants
 celebrationRouter.get('/today', async (req: Request, res: Response) => {

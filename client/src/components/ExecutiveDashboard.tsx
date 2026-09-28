@@ -248,28 +248,37 @@ export const ExecutiveDashboard: React.FC = () => {
           </span>
         </div>
 
-        {/* Group 1 & Group 2 Split */}
-        <div className="bg-white p-5 rounded-3xl border border-slate-200/90 shadow-sm space-y-1">
+        {/* 4 Cells Distribution */}
+        <div className="bg-white p-5 rounded-3xl border border-slate-200/90 shadow-sm space-y-1.5">
           <div className="flex items-center justify-between">
             <span className="text-xs font-bold text-slate-600 uppercase tracking-wider">
-              Group 1 / Group 2 Split
+              Cells Membership Split
             </span>
             <Layers className="w-4 h-4 text-indigo-600" />
           </div>
-          <div className="text-lg font-extrabold text-slate-900 mt-1 flex items-center space-x-2">
-            <span className="text-blue-700 font-bold">{analytics.group1Total} (G1)</span>
-            <span className="text-slate-300">/</span>
-            <span className="text-purple-700 font-bold">{analytics.group2Total} (G2)</span>
+          <div className="grid grid-cols-4 gap-1 text-[11px] font-bold mt-1">
+            <span className="text-amber-600">Joy: {analytics.cellTotals?.JOY ?? analytics.group1Total}</span>
+            <span className="text-blue-600">Faith: {analytics.cellTotals?.FAITH ?? analytics.group2Total}</span>
+            <span className="text-emerald-600">Hope: {analytics.cellTotals?.HOPE ?? 0}</span>
+            <span className="text-rose-600">Love: {analytics.cellTotals?.LOVE ?? 0}</span>
           </div>
           {/* Progress split bar */}
           <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden flex mt-1">
             <div
-              className="bg-blue-600 h-full"
-              style={{ width: `${Math.round((analytics.group1Total / totalMembers) * 100)}%` }}
+              className="bg-amber-500 h-full"
+              style={{ width: `${Math.round(((analytics.cellTotals?.JOY ?? analytics.group1Total) / totalMembers) * 100)}%` }}
             ></div>
             <div
-              className="bg-purple-600 h-full"
-              style={{ width: `${Math.round((analytics.group2Total / totalMembers) * 100)}%` }}
+              className="bg-blue-600 h-full"
+              style={{ width: `${Math.round(((analytics.cellTotals?.FAITH ?? analytics.group2Total) / totalMembers) * 100)}%` }}
+            ></div>
+            <div
+              className="bg-emerald-600 h-full"
+              style={{ width: `${Math.round(((analytics.cellTotals?.HOPE ?? 0) / totalMembers) * 100)}%` }}
+            ></div>
+            <div
+              className="bg-rose-600 h-full"
+              style={{ width: `${Math.round(((analytics.cellTotals?.LOVE ?? 0) / totalMembers) * 100)}%` }}
             ></div>
           </div>
         </div>

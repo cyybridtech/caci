@@ -1,13 +1,18 @@
 import { Router, Request, Response } from 'express';
 import { prisma } from '../db.js';
-import { ChurchGroup, Gender, MemberStatus, MaritalStatus, AssimilationStage } from '@prisma/client';
+import { ChurchGroup, Gender, MemberStatus, MaritalStatus, AssimilationStage, UserRole } from '@prisma/client';
+import { requireAuth, requireRole } from '../middleware/auth.js';
 
 export const memberRouter = Router();
+
+// Protect all member endpoints
+memberRouter.use(requireAuth);
 
 // GET /api/members/:id/attendance-history
 memberRouter.get('/:id/attendance-history', async (req: Request, res: Response) => {
   try {
     const id = req.params.id as string;
+    const currentUser = req.user!;
 
     const member = await prisma.member.findUnique({
       where: { id },
@@ -20,6 +25,11 @@ memberRouter.get('/:id/attendance-history', async (req: Request, res: Response) 
 
     if (!member) {
       return res.status(404).json({ error: 'Member not found' });
+    }
+
+    // Cell leader check
+    if (currentUser.role === UserRole.CELL_LEADER && member.churchGroup !== currentUser.cell) {
+      return res.status(403).json({ error: 'You can only view members from your assigned cell' });
     }
 
     const allSessions = await prisma.serviceSession.findMany({
@@ -75,19 +85,35 @@ memberRouter.get('/:id/attendance-history', async (req: Request, res: Response) 
   }
 });
 
-// GET /api/members - list all members
+// GET /api/members - list members
 memberRouter.get('/', async (req: Request, res: Response) => {
   try {
-    const { search, group, status } = req.query;
+    const { search, group, status, departmentId, stage } = req.query;
+    const currentUser = req.user!;
 
     const whereClause: any = {};
 
-    if (group && (group === 'GROUP_1' || group === 'GROUP_2')) {
+    // Cell Leader can only see members in their own cell
+    if (currentUser.role === UserRole.CELL_LEADER) {
+      if (currentUser.cell) {
+        whereClause.churchGroup = currentUser.cell as ChurchGroup;
+      }
+    } else if (group && ['JOY', 'FAITH', 'HOPE', 'LOVE'].includes(group as string)) {
       whereClause.churchGroup = group as ChurchGroup;
     }
 
     if (status && (status === 'ACTIVE' || status === 'INACTIVE')) {
       whereClause.status = status as MemberStatus;
+    }
+
+    if (stage && typeof stage === 'string' && stage !== 'ALL') {
+      whereClause.assimilationStage = stage as AssimilationStage;
+    }
+
+    if (departmentId && typeof departmentId === 'string' && departmentId !== 'ALL') {
+      whereClause.departments = {
+        some: { departmentId }
+      };
     }
 
     if (search && typeof search === 'string' && search.trim() !== '') {
@@ -108,7 +134,6 @@ memberRouter.get('/', async (req: Request, res: Response) => {
       select: {
         id: true,
         memberCode: true,
-        // photoUrl excluded from list — loads only on individual profile view
         firstName: true,
         lastName: true,
         phone: true,
@@ -132,14 +157,22 @@ memberRouter.get('/', async (req: Request, res: Response) => {
         notes: true,
         createdAt: true,
         updatedAt: true,
+        departments: {
+          select: {
+            departmentId: true,
+            department: {
+              select: { id: true, name: true }
+            }
+          }
+        },
         _count: {
-          select: { attendance: true, contributions: true }
+          select: { attendance: true, contributions: true, pledges: true }
         }
       },
       orderBy: [{ lastName: 'asc' }, { firstName: 'asc' }]
     });
 
-    res.setHeader('Cache-Control', 'private, max-age=30');
+    res.setHeader('Cache-Control', 'private, max-age=10');
     res.json(members);
   } catch (error: any) {
     console.error('Error fetching members:', error);
@@ -147,10 +180,12 @@ memberRouter.get('/', async (req: Request, res: Response) => {
   }
 });
 
-// GET /api/members/:id - member details
+// GET /api/members/:id - full member details including contributions and pledges
 memberRouter.get('/:id', async (req: Request, res: Response) => {
   try {
     const id = req.params.id as string;
+    const currentUser = req.user!;
+
     const member = await prisma.member.findUnique({
       where: { id },
       include: {
@@ -160,17 +195,32 @@ memberRouter.get('/:id', async (req: Request, res: Response) => {
         attendance: {
           include: { session: true },
           orderBy: { checkInTime: 'desc' },
-          take: 20
+          take: 30
         },
         contributions: {
+          include: { session: true },
           orderBy: { transactionDate: 'desc' },
-          take: 20
+          take: 50
+        },
+        pledges: {
+          include: {
+            campaign: true,
+            payments: {
+              orderBy: { transactionDate: 'desc' }
+            }
+          },
+          orderBy: { createdAt: 'desc' }
         }
       }
     });
 
     if (!member) {
       return res.status(404).json({ error: 'Member not found' });
+    }
+
+    // Cell leader restriction
+    if (currentUser.role === UserRole.CELL_LEADER && member.churchGroup !== currentUser.cell) {
+      return res.status(403).json({ error: 'You can only view members from your assigned cell' });
     }
 
     res.json(member);
@@ -180,9 +230,15 @@ memberRouter.get('/:id', async (req: Request, res: Response) => {
   }
 });
 
-// POST /api/members - create member
+// POST /api/members - create member (Admin, Cell Leader)
 memberRouter.post('/', async (req: Request, res: Response) => {
   try {
+    const currentUser = req.user!;
+
+    if (currentUser.role === UserRole.MEDIA_TEAM || currentUser.role === UserRole.FINANCE) {
+      return res.status(403).json({ error: 'Media team and Finance are not authorized to create members' });
+    }
+
     const {
       firstName,
       lastName,
@@ -195,6 +251,7 @@ memberRouter.post('/', async (req: Request, res: Response) => {
       role,
       status,
       dateOfBirth,
+      weddingAnniversary,
       hometown,
       address,
       occupation,
@@ -202,14 +259,25 @@ memberRouter.post('/', async (req: Request, res: Response) => {
       emergencyContactPhone,
       isWaterBaptized,
       isHolyGhostBaptized,
-      notes
+      assimilationStage,
+      invitedBy,
+      notes,
+      departmentIds
     } = req.body;
 
     if (!firstName || !lastName) {
       return res.status(400).json({ error: 'First name and last name are required' });
     }
 
-    // Use the highest existing code (not count) so deletions/retries never cause P2002 collisions
+    // Cell leader forces member into their own cell
+    let targetCell: ChurchGroup = ChurchGroup.JOY;
+    if (currentUser.role === UserRole.CELL_LEADER) {
+      targetCell = (currentUser.cell as ChurchGroup) || ChurchGroup.JOY;
+    } else if (churchGroup && ['JOY', 'FAITH', 'HOPE', 'LOVE'].includes(churchGroup)) {
+      targetCell = churchGroup as ChurchGroup;
+    }
+
+    // Use the highest existing code to prevent P2002 duplicate collisions
     const lastMember = await prisma.member.findFirst({
       where: { memberCode: { startsWith: 'CACI-' } },
       orderBy: { memberCode: 'desc' },
@@ -228,12 +296,13 @@ memberRouter.post('/', async (req: Request, res: Response) => {
         lastName: lastName.trim(),
         phone: phone ? phone.trim() : null,
         email: email ? email.trim() : null,
-        gender: gender || Gender.MALE,
-        maritalStatus: maritalStatus || MaritalStatus.SINGLE,
-        churchGroup: churchGroup === 'GROUP_2' ? ChurchGroup.GROUP_2 : ChurchGroup.GROUP_1,
+        gender: (gender as Gender) || Gender.MALE,
+        maritalStatus: (maritalStatus as MaritalStatus) || MaritalStatus.SINGLE,
+        churchGroup: targetCell,
         role: role || 'Member',
         status: status === 'INACTIVE' ? MemberStatus.INACTIVE : MemberStatus.ACTIVE,
         dateOfBirth: dateOfBirth ? new Date(dateOfBirth) : null,
+        weddingAnniversary: weddingAnniversary ? new Date(weddingAnniversary) : null,
         hometown: hometown ? hometown.trim() : null,
         address: address ? address.trim() : null,
         occupation: occupation ? occupation.trim() : null,
@@ -241,7 +310,14 @@ memberRouter.post('/', async (req: Request, res: Response) => {
         emergencyContactPhone: emergencyContactPhone ? emergencyContactPhone.trim() : null,
         isWaterBaptized: Boolean(isWaterBaptized),
         isHolyGhostBaptized: Boolean(isHolyGhostBaptized),
-        notes: notes ? notes.trim() : null
+        assimilationStage: (assimilationStage as AssimilationStage) || AssimilationStage.REGULAR_MEMBER,
+        invitedBy: invitedBy ? invitedBy.trim() : null,
+        notes: notes ? notes.trim() : null,
+        departments: departmentIds && Array.isArray(departmentIds) ? {
+          create: departmentIds.map((deptId: string) => ({
+            department: { connect: { id: deptId } }
+          }))
+        } : undefined
       }
     });
 
@@ -252,7 +328,6 @@ memberRouter.post('/', async (req: Request, res: Response) => {
       error: 'Failed to create member',
       message: error.message,
       code: error.code,
-      meta: error.meta,
     });
   }
 });
@@ -261,6 +336,21 @@ memberRouter.post('/', async (req: Request, res: Response) => {
 memberRouter.put('/:id', async (req: Request, res: Response) => {
   try {
     const id = req.params.id as string;
+    const currentUser = req.user!;
+
+    if (currentUser.role === UserRole.MEDIA_TEAM || currentUser.role === UserRole.FINANCE) {
+      return res.status(403).json({ error: 'Not authorized to update members' });
+    }
+
+    const existing = await prisma.member.findUnique({ where: { id } });
+    if (!existing) {
+      return res.status(404).json({ error: 'Member not found' });
+    }
+
+    if (currentUser.role === UserRole.CELL_LEADER && existing.churchGroup !== currentUser.cell) {
+      return res.status(403).json({ error: 'You can only edit members within your assigned cell' });
+    }
+
     const {
       firstName,
       lastName,
@@ -273,6 +363,7 @@ memberRouter.put('/:id', async (req: Request, res: Response) => {
       role,
       status,
       dateOfBirth,
+      weddingAnniversary,
       hometown,
       address,
       occupation,
@@ -280,8 +371,15 @@ memberRouter.put('/:id', async (req: Request, res: Response) => {
       emergencyContactPhone,
       isWaterBaptized,
       isHolyGhostBaptized,
+      assimilationStage,
+      invitedBy,
       notes
     } = req.body;
+
+    let targetCell = undefined;
+    if (currentUser.role === UserRole.ADMIN && churchGroup && ['JOY', 'FAITH', 'HOPE', 'LOVE'].includes(churchGroup)) {
+      targetCell = churchGroup as ChurchGroup;
+    }
 
     const updated = await prisma.member.update({
       where: { id },
@@ -293,10 +391,11 @@ memberRouter.put('/:id', async (req: Request, res: Response) => {
         email: email !== undefined ? (email ? email.trim() : null) : undefined,
         gender: gender || undefined,
         maritalStatus: maritalStatus || undefined,
-        churchGroup: churchGroup ? (churchGroup === 'GROUP_2' ? ChurchGroup.GROUP_2 : ChurchGroup.GROUP_1) : undefined,
+        churchGroup: targetCell,
         role: role || undefined,
         status: status ? (status === 'INACTIVE' ? MemberStatus.INACTIVE : MemberStatus.ACTIVE) : undefined,
         dateOfBirth: dateOfBirth ? new Date(dateOfBirth) : undefined,
+        weddingAnniversary: weddingAnniversary ? new Date(weddingAnniversary) : undefined,
         hometown: hometown !== undefined ? (hometown ? hometown.trim() : null) : undefined,
         address: address !== undefined ? (address ? address.trim() : null) : undefined,
         occupation: occupation !== undefined ? (occupation ? occupation.trim() : null) : undefined,
@@ -304,6 +403,8 @@ memberRouter.put('/:id', async (req: Request, res: Response) => {
         emergencyContactPhone: emergencyContactPhone !== undefined ? (emergencyContactPhone ? emergencyContactPhone.trim() : null) : undefined,
         isWaterBaptized: isWaterBaptized !== undefined ? Boolean(isWaterBaptized) : undefined,
         isHolyGhostBaptized: isHolyGhostBaptized !== undefined ? Boolean(isHolyGhostBaptized) : undefined,
+        assimilationStage: assimilationStage || undefined,
+        invitedBy: invitedBy !== undefined ? (invitedBy ? invitedBy.trim() : null) : undefined,
         notes: notes !== undefined ? (notes ? notes.trim() : null) : undefined
       }
     });
@@ -315,10 +416,56 @@ memberRouter.put('/:id', async (req: Request, res: Response) => {
   }
 });
 
+// PATCH /api/members/:id/assimilation - update stage
+memberRouter.patch('/:id/assimilation', async (req: Request, res: Response) => {
+  try {
+    const id = req.params.id as string;
+    const { assimilationStage, churchGroup } = req.body;
+    const currentUser = req.user!;
+
+    const existing = await prisma.member.findUnique({ where: { id } });
+    if (!existing) return res.status(404).json({ error: 'Member not found' });
+
+    if (currentUser.role === UserRole.CELL_LEADER && existing.churchGroup !== currentUser.cell) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+
+    const updated = await prisma.member.update({
+      where: { id },
+      data: {
+        assimilationStage: assimilationStage || undefined,
+        churchGroup: (currentUser.role === UserRole.ADMIN && churchGroup && ['JOY', 'FAITH', 'HOPE', 'LOVE'].includes(churchGroup))
+          ? (churchGroup as ChurchGroup)
+          : undefined,
+      }
+    });
+
+    res.json(updated);
+  } catch (error: any) {
+    console.error('Error updating assimilation:', error);
+    res.status(500).json({ error: 'Failed to update assimilation stage' });
+  }
+});
+
 // DELETE /api/members/:id
 memberRouter.delete('/:id', async (req: Request, res: Response) => {
   try {
     const id = req.params.id as string;
+    const currentUser = req.user!;
+
+    if (currentUser.role === UserRole.MEDIA_TEAM || currentUser.role === UserRole.FINANCE) {
+      return res.status(403).json({ error: 'Unauthorized to delete members' });
+    }
+
+    const member = await prisma.member.findUnique({ where: { id } });
+    if (!member) {
+      return res.status(404).json({ error: 'Member not found' });
+    }
+
+    if (currentUser.role === UserRole.CELL_LEADER && member.churchGroup !== currentUser.cell) {
+      return res.status(403).json({ error: 'You can only delete members in your assigned cell' });
+    }
+
     await prisma.member.delete({ where: { id } });
     res.json({ success: true, message: 'Member deleted successfully' });
   } catch (error: any) {
