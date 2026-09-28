@@ -6,23 +6,23 @@ dotenv.config();
 const prisma = new PrismaClient();
 
 async function seed() {
-  console.log('Checking for admin user...');
-  const existing = await prisma.user.findUnique({ where: { username: 'admin' } });
-  if (existing) {
-    console.log('Admin user already exists:', existing.username);
-    await prisma.$disconnect();
-    return;
-  }
+  console.log('Ensuring admin user (admin / admin)...');
   const hashed = await bcrypt.hash('admin', 12);
-  const admin = await prisma.user.create({
-    data: {
+  const admin = await prisma.user.upsert({
+    where: { username: 'admin' },
+    update: {
+      password: hashed,
+      role: UserRole.ADMIN,
+      mustChangePassword: false,
+    },
+    create: {
       username: 'admin',
       password: hashed,
       role: UserRole.ADMIN,
-      mustChangePassword: true,
+      mustChangePassword: false,
     },
   });
-  console.log('Admin user created successfully! Username: admin, Password: admin (must change on first login)');
+  console.log('Admin user ready! Username: admin, Password: admin, mustChangePassword: false');
   await prisma.$disconnect();
 }
 
