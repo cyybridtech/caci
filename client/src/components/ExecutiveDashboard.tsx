@@ -764,7 +764,13 @@ export const ExecutiveDashboard: React.FC = () => {
                   ) : (
                     <div
                       className={`w-9 h-9 rounded-xl flex items-center justify-center font-bold text-xs text-white shrink-0 ${
-                        member.churchGroup === 'GROUP_1' ? 'bg-blue-600' : 'bg-purple-600'
+                        member.churchGroup === 'JOY'
+                          ? 'bg-amber-500'
+                          : member.churchGroup === 'FAITH'
+                          ? 'bg-blue-600'
+                          : member.churchGroup === 'HOPE'
+                          ? 'bg-emerald-600'
+                          : 'bg-rose-600'
                       }`}
                     >
                       {member.firstName[0]}
@@ -778,13 +784,17 @@ export const ExecutiveDashboard: React.FC = () => {
                         {member.firstName} {member.lastName}
                       </span>
                       <span
-                        className={`text-[9px] font-extrabold px-1.5 py-0.2 rounded ${
-                          member.churchGroup === 'GROUP_1'
+                        className={`text-[9px] font-extrabold px-1.5 py-0.2 rounded uppercase ${
+                          member.churchGroup === 'JOY'
+                            ? 'bg-amber-100 text-amber-800'
+                            : member.churchGroup === 'FAITH'
                             ? 'bg-blue-100 text-blue-800'
-                            : 'bg-purple-100 text-purple-800'
+                            : member.churchGroup === 'HOPE'
+                            ? 'bg-emerald-100 text-emerald-800'
+                            : 'bg-rose-100 text-rose-800'
                         }`}
                       >
-                        {member.churchGroup === 'GROUP_1' ? 'G1' : 'G2'}
+                        {member.churchGroup}
                       </span>
                     </div>
                     <span className="text-[11px] text-slate-500 font-mono block truncate">

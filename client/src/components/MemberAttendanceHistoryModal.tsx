@@ -114,13 +114,17 @@ export const MemberAttendanceHistoryModal: React.FC<MemberAttendanceHistoryModal
                     {m.firstName} {m.lastName}
                   </span>
                   <span
-                    className={`px-1.5 py-0.5 rounded text-[10px] font-extrabold ${
-                      m.churchGroup === 'GROUP_1'
+                    className={`px-1.5 py-0.5 rounded text-[10px] font-extrabold uppercase ${
+                      m.churchGroup === 'JOY'
+                        ? 'bg-amber-100 text-amber-800'
+                        : m.churchGroup === 'FAITH'
                         ? 'bg-blue-100 text-blue-800'
-                        : 'bg-purple-100 text-purple-800'
+                        : m.churchGroup === 'HOPE'
+                        ? 'bg-emerald-100 text-emerald-800'
+                        : 'bg-rose-100 text-rose-800'
                     }`}
                   >
-                    {m.churchGroup === 'GROUP_1' ? 'Group 1' : 'Group 2'}
+                    {m.churchGroup}
                   </span>
                 </button>
               ))}
@@ -134,7 +138,13 @@ export const MemberAttendanceHistoryModal: React.FC<MemberAttendanceHistoryModal
             <div className="flex items-center space-x-4">
               <div
                 className={`w-16 h-16 rounded-2xl flex items-center justify-center font-bold text-2xl text-white shadow-lg ${
-                  member.churchGroup === 'GROUP_1' ? 'bg-blue-600' : 'bg-purple-600'
+                  member.churchGroup === 'JOY'
+                    ? 'bg-amber-500'
+                    : member.churchGroup === 'FAITH'
+                    ? 'bg-blue-600'
+                    : member.churchGroup === 'HOPE'
+                    ? 'bg-emerald-600'
+                    : 'bg-rose-600'
                 }`}
               >
                 {member.firstName[0]}
@@ -147,12 +157,22 @@ export const MemberAttendanceHistoryModal: React.FC<MemberAttendanceHistoryModal
                   </h2>
                   <span
                     className={`px-2.5 py-0.5 rounded-full text-xs font-bold uppercase tracking-wider ${
-                      member.churchGroup === 'GROUP_1'
+                      member.churchGroup === 'JOY'
+                        ? 'bg-amber-500/40 text-amber-200 border border-amber-400/50'
+                        : member.churchGroup === 'FAITH'
                         ? 'bg-blue-500/40 text-blue-200 border border-blue-400/50'
-                        : 'bg-purple-500/40 text-purple-200 border border-purple-400/50'
+                        : member.churchGroup === 'HOPE'
+                        ? 'bg-emerald-500/40 text-emerald-200 border border-emerald-400/50'
+                        : 'bg-rose-500/40 text-rose-200 border border-rose-400/50'
                     }`}
                   >
-                    {member.churchGroup === 'GROUP_1' ? 'Group 1' : 'Group 2'}
+                    {member.churchGroup === 'JOY'
+                      ? 'Joy Cell'
+                      : member.churchGroup === 'FAITH'
+                      ? 'Faith Cell'
+                      : member.churchGroup === 'HOPE'
+                      ? 'Hope Cell'
+                      : 'Love Cell'}
                   </span>
                 </div>
                 <div className="flex items-center space-x-3 mt-1 text-xs text-slate-300">

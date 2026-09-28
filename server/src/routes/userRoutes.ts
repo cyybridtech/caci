@@ -114,7 +114,7 @@ userRouter.post('/', async (req: Request, res: Response) => {
 // DELETE /api/users/:id - Admin or Cell Leader deletes user
 userRouter.delete('/:id', async (req: Request, res: Response) => {
   try {
-    const { id } = req.params;
+    const id = req.params.id as string;
     const currentUser = req.user!;
 
     if (id === currentUser.userId) {
@@ -145,7 +145,7 @@ userRouter.delete('/:id', async (req: Request, res: Response) => {
 // PATCH /api/users/:id/reset-password - Resets password to username
 userRouter.patch('/:id/reset-password', async (req: Request, res: Response) => {
   try {
-    const { id } = req.params;
+    const id = req.params.id as string;
     const currentUser = req.user!;
 
     const targetUser = await prisma.user.findUnique({ where: { id } });

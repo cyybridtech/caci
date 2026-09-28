@@ -67,7 +67,7 @@ export const MessagingView: React.FC<MessagingViewProps> = ({
   // Specific member selection state
   const [selectedMemberIds, setSelectedMemberIds] = useState<string[]>([]);
   const [memberSearchQuery, setMemberSearchQuery] = useState('');
-  const [memberGroupFilter, setMemberGroupFilter] = useState<'ALL' | 'GROUP_1' | 'GROUP_2'>('ALL');
+  const [memberGroupFilter, setMemberGroupFilter] = useState<'ALL' | 'JOY' | 'FAITH' | 'HOPE' | 'LOVE'>('ALL');
 
   // Filter members for specific selection
   const selectableMembers = members.filter((m) => {
@@ -106,11 +106,17 @@ export const MessagingView: React.FC<MessagingViewProps> = ({
     if (targetType === 'ABSENTEES_TODAY') {
       return "Dear {firstName}, we missed your fellowship at CACI today! We pray God's blessing over your home and look forward to seeing you at our next service.";
     }
-    if (targetType === 'GROUP_1') {
-      return "Calvary greetings {firstName}! Important announcement for all CACI Group 1 members: please take note of our upcoming group fellowship.";
+    if (targetType === 'JOY') {
+      return "Calvary greetings {firstName}! Important announcement for all CACI Joy Cell members: please take note of our upcoming cell fellowship.";
     }
-    if (targetType === 'GROUP_2') {
-      return "Calvary greetings {firstName}! Important announcement for all CACI Group 2 members: please take note of our upcoming group fellowship.";
+    if (targetType === 'FAITH') {
+      return "Calvary greetings {firstName}! Important announcement for all CACI Faith Cell members: please take note of our upcoming cell fellowship.";
+    }
+    if (targetType === 'HOPE') {
+      return "Calvary greetings {firstName}! Important announcement for all CACI Hope Cell members: please take note of our upcoming cell fellowship.";
+    }
+    if (targetType === 'LOVE') {
+      return "Calvary greetings {firstName}! Important announcement for all CACI Love Cell members: please take note of our upcoming cell fellowship.";
     }
     if (targetType === 'SPECIFIC_MEMBERS') {
       return "Calvary greetings {firstName}! Please take note of this special church announcement from CACI leadership.";
@@ -340,17 +346,35 @@ export const MessagingView: React.FC<MessagingViewProps> = ({
 
                   <button
                     type="button"
-                    onClick={() => setTargetType('GROUP_1')}
+                    onClick={() => setTargetType('JOY')}
                     className={`p-3 rounded-2xl border-2 text-left transition flex items-center justify-between ${
-                      targetType === 'GROUP_1'
+                      targetType === 'JOY'
+                        ? 'border-amber-600 bg-amber-50/70 text-amber-950 font-bold'
+                        : 'border-slate-200 text-slate-600 hover:border-slate-300'
+                    }`}
+                  >
+                    <div>
+                      <span className="text-xs font-bold block">Joy Cell</span>
+                      <span className="text-[11px] text-slate-500">
+                        {members.filter((m) => m.churchGroup === 'JOY').length} members
+                      </span>
+                    </div>
+                    <span className="w-2.5 h-2.5 rounded-full bg-amber-500"></span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setTargetType('FAITH')}
+                    className={`p-3 rounded-2xl border-2 text-left transition flex items-center justify-between ${
+                      targetType === 'FAITH'
                         ? 'border-blue-600 bg-blue-50/70 text-blue-950 font-bold'
                         : 'border-slate-200 text-slate-600 hover:border-slate-300'
                     }`}
                   >
                     <div>
-                      <span className="text-xs font-bold block">All Group 1</span>
+                      <span className="text-xs font-bold block">Faith Cell</span>
                       <span className="text-[11px] text-slate-500">
-                        {members.filter((m) => m.churchGroup === 'GROUP_1').length} members
+                        {members.filter((m) => m.churchGroup === 'FAITH').length} members
                       </span>
                     </div>
                     <span className="w-2.5 h-2.5 rounded-full bg-blue-600"></span>
@@ -358,20 +382,38 @@ export const MessagingView: React.FC<MessagingViewProps> = ({
 
                   <button
                     type="button"
-                    onClick={() => setTargetType('GROUP_2')}
+                    onClick={() => setTargetType('HOPE')}
                     className={`p-3 rounded-2xl border-2 text-left transition flex items-center justify-between ${
-                      targetType === 'GROUP_2'
-                        ? 'border-purple-600 bg-purple-50/70 text-purple-950 font-bold'
+                      targetType === 'HOPE'
+                        ? 'border-emerald-600 bg-emerald-50/70 text-emerald-950 font-bold'
                         : 'border-slate-200 text-slate-600 hover:border-slate-300'
                     }`}
                   >
                     <div>
-                      <span className="text-xs font-bold block">All Group 2</span>
+                      <span className="text-xs font-bold block">Hope Cell</span>
                       <span className="text-[11px] text-slate-500">
-                        {members.filter((m) => m.churchGroup === 'GROUP_2').length} members
+                        {members.filter((m) => m.churchGroup === 'HOPE').length} members
                       </span>
                     </div>
-                    <span className="w-2.5 h-2.5 rounded-full bg-purple-600"></span>
+                    <span className="w-2.5 h-2.5 rounded-full bg-emerald-600"></span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setTargetType('LOVE')}
+                    className={`p-3 rounded-2xl border-2 text-left transition flex items-center justify-between ${
+                      targetType === 'LOVE'
+                        ? 'border-rose-600 bg-rose-50/70 text-rose-950 font-bold'
+                        : 'border-slate-200 text-slate-600 hover:border-slate-300'
+                    }`}
+                  >
+                    <div>
+                      <span className="text-xs font-bold block">Love Cell</span>
+                      <span className="text-[11px] text-slate-500">
+                        {members.filter((m) => m.churchGroup === 'LOVE').length} members
+                      </span>
+                    </div>
+                    <span className="w-2.5 h-2.5 rounded-full bg-rose-600"></span>
                   </button>
                 </div>
               </div>
@@ -415,7 +457,7 @@ export const MessagingView: React.FC<MessagingViewProps> = ({
                       />
                     </div>
 
-                    <div className="flex items-center space-x-1 bg-white p-1 rounded-xl border border-indigo-200">
+                    <div className="flex items-center space-x-1 bg-white p-1 rounded-xl border border-indigo-200 overflow-x-auto">
                       <button
                         type="button"
                         onClick={() => setMemberGroupFilter('ALL')}
@@ -427,21 +469,39 @@ export const MessagingView: React.FC<MessagingViewProps> = ({
                       </button>
                       <button
                         type="button"
-                        onClick={() => setMemberGroupFilter('GROUP_1')}
+                        onClick={() => setMemberGroupFilter('JOY')}
                         className={`px-2 py-1 rounded-lg text-[11px] font-bold ${
-                          memberGroupFilter === 'GROUP_1' ? 'bg-blue-600 text-white' : 'text-blue-700'
+                          memberGroupFilter === 'JOY' ? 'bg-amber-500 text-white' : 'text-amber-700'
                         }`}
                       >
-                        Group 1
+                        Joy
                       </button>
                       <button
                         type="button"
-                        onClick={() => setMemberGroupFilter('GROUP_2')}
+                        onClick={() => setMemberGroupFilter('FAITH')}
                         className={`px-2 py-1 rounded-lg text-[11px] font-bold ${
-                          memberGroupFilter === 'GROUP_2' ? 'bg-purple-600 text-white' : 'text-purple-700'
+                          memberGroupFilter === 'FAITH' ? 'bg-blue-600 text-white' : 'text-blue-700'
                         }`}
                       >
-                        Group 2
+                        Faith
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setMemberGroupFilter('HOPE')}
+                        className={`px-2 py-1 rounded-lg text-[11px] font-bold ${
+                          memberGroupFilter === 'HOPE' ? 'bg-emerald-600 text-white' : 'text-emerald-700'
+                        }`}
+                      >
+                        Hope
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setMemberGroupFilter('LOVE')}
+                        className={`px-2 py-1 rounded-lg text-[11px] font-bold ${
+                          memberGroupFilter === 'LOVE' ? 'bg-rose-600 text-white' : 'text-rose-700'
+                        }`}
+                      >
+                        Love
                       </button>
                     </div>
                   </div>
@@ -482,7 +542,13 @@ export const MessagingView: React.FC<MessagingViewProps> = ({
                             ) : (
                               <div
                                 className={`w-7 h-7 rounded-lg flex items-center justify-center font-bold text-[10px] text-white shrink-0 ${
-                                  member.churchGroup === 'GROUP_1' ? 'bg-blue-600' : 'bg-purple-600'
+                                  member.churchGroup === 'JOY'
+                                    ? 'bg-amber-500'
+                                    : member.churchGroup === 'FAITH'
+                                    ? 'bg-blue-600'
+                                    : member.churchGroup === 'HOPE'
+                                    ? 'bg-emerald-600'
+                                    : 'bg-rose-600'
                                 }`}
                               >
                                 {member.firstName[0]}
@@ -503,12 +569,16 @@ export const MessagingView: React.FC<MessagingViewProps> = ({
                           <div className="flex items-center space-x-1.5 shrink-0">
                             <span
                               className={`px-1.5 py-0.2 rounded text-[9px] font-extrabold uppercase ${
-                                member.churchGroup === 'GROUP_1'
+                                member.churchGroup === 'JOY'
+                                  ? 'bg-amber-100 text-amber-800'
+                                  : member.churchGroup === 'FAITH'
                                   ? 'bg-blue-100 text-blue-800'
-                                  : 'bg-purple-100 text-purple-800'
+                                  : member.churchGroup === 'HOPE'
+                                  ? 'bg-emerald-100 text-emerald-800'
+                                  : 'bg-rose-100 text-rose-800'
                               }`}
                             >
-                              {member.churchGroup === 'GROUP_1' ? 'G1' : 'G2'}
+                              {member.churchGroup}
                             </span>
                             {member.role !== 'Member' && (
                               <span className="px-1.5 py-0.2 rounded text-[9px] font-semibold bg-slate-100 text-slate-700">

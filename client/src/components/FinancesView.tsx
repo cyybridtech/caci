@@ -95,7 +95,7 @@ export const FinancesView: React.FC<FinancesViewProps> = ({
           <div>
             <h2 className="text-lg font-extrabold text-slate-900">Church Finances & Tithes</h2>
             <p className="text-xs text-slate-500">
-              Record tithes, sunday offerings, welfare dues, and compare giving across Group 1 & Group 2
+              Record tithes, sunday offerings, welfare dues, and compare giving across the 4 church cells
             </p>
           </div>
         </div>
@@ -160,42 +160,72 @@ export const FinancesView: React.FC<FinancesViewProps> = ({
         </div>
       </div>
 
-      {/* Giving Comparison: Group 1 vs Group 2 */}
+      {/* Giving Comparison Across Cells */}
       <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm space-y-4">
         <h3 className="font-extrabold text-sm text-slate-900 flex items-center space-x-2">
           <TrendingUp className="w-4 h-4 text-blue-600" />
-          <span>Giving Comparison: Group 1 vs Group 2</span>
+          <span>Giving Comparison Across Cells (Joy, Faith, Hope, Love)</span>
         </h3>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="p-4 rounded-2xl bg-amber-50/70 border border-amber-200 space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="font-bold text-xs text-amber-900 uppercase tracking-wider">
+                Joy Cell
+              </span>
+              <span className="px-2 py-0.5 rounded text-[10px] font-extrabold bg-amber-500 text-white">
+                Joy
+              </span>
+            </div>
+            <div className="text-2xl font-extrabold text-amber-800">
+              GH₵ {Number(summary?.cellComparison?.JOY ?? summary?.groupComparison?.group1 ?? 0).toFixed(2)}
+            </div>
+            <p className="text-[11px] text-amber-700">Contributions from Joy Cell</p>
+          </div>
+
           <div className="p-4 rounded-2xl bg-blue-50/70 border border-blue-200 space-y-2">
             <div className="flex items-center justify-between">
               <span className="font-bold text-xs text-blue-900 uppercase tracking-wider">
-                Group 1 Total Giving
+                Faith Cell
               </span>
               <span className="px-2 py-0.5 rounded text-[10px] font-extrabold bg-blue-600 text-white">
-                Group 1
+                Faith
               </span>
             </div>
             <div className="text-2xl font-extrabold text-blue-800">
-              GH₵ {Number(summary?.groupComparison.group1 || 0).toFixed(2)}
+              GH₵ {Number(summary?.cellComparison?.FAITH ?? summary?.groupComparison?.group2 ?? 0).toFixed(2)}
             </div>
-            <p className="text-[11px] text-blue-700">Contributions from registered Group 1 members</p>
+            <p className="text-[11px] text-blue-700">Contributions from Faith Cell</p>
           </div>
 
-          <div className="p-4 rounded-2xl bg-purple-50/70 border border-purple-200 space-y-2">
+          <div className="p-4 rounded-2xl bg-emerald-50/70 border border-emerald-200 space-y-2">
             <div className="flex items-center justify-between">
-              <span className="font-bold text-xs text-purple-900 uppercase tracking-wider">
-                Group 2 Total Giving
+              <span className="font-bold text-xs text-emerald-900 uppercase tracking-wider">
+                Hope Cell
               </span>
-              <span className="px-2 py-0.5 rounded text-[10px] font-extrabold bg-purple-600 text-white">
-                Group 2
+              <span className="px-2 py-0.5 rounded text-[10px] font-extrabold bg-emerald-600 text-white">
+                Hope
               </span>
             </div>
-            <div className="text-2xl font-extrabold text-purple-800">
-              GH₵ {Number(summary?.groupComparison.group2 || 0).toFixed(2)}
+            <div className="text-2xl font-extrabold text-emerald-800">
+              GH₵ {Number(summary?.cellComparison?.HOPE ?? 0).toFixed(2)}
             </div>
-            <p className="text-[11px] text-purple-700">Contributions from registered Group 2 members</p>
+            <p className="text-[11px] text-emerald-700">Contributions from Hope Cell</p>
+          </div>
+
+          <div className="p-4 rounded-2xl bg-rose-50/70 border border-rose-200 space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="font-bold text-xs text-rose-900 uppercase tracking-wider">
+                Love Cell
+              </span>
+              <span className="px-2 py-0.5 rounded text-[10px] font-extrabold bg-rose-600 text-white">
+                Love
+              </span>
+            </div>
+            <div className="text-2xl font-extrabold text-rose-800">
+              GH₵ {Number(summary?.cellComparison?.LOVE ?? 0).toFixed(2)}
+            </div>
+            <p className="text-[11px] text-rose-700">Contributions from Love Cell</p>
           </div>
         </div>
       </div>
@@ -261,7 +291,13 @@ export const FinancesView: React.FC<FinancesViewProps> = ({
                         ) : (
                           <div
                             className={`w-7 h-7 rounded-lg flex items-center justify-center font-bold text-xs text-white ${
-                              c.member.churchGroup === 'GROUP_1' ? 'bg-blue-600' : 'bg-purple-600'
+                              c.member.churchGroup === 'JOY'
+                                ? 'bg-amber-500'
+                                : c.member.churchGroup === 'FAITH'
+                                ? 'bg-blue-600'
+                                : c.member.churchGroup === 'HOPE'
+                                ? 'bg-emerald-600'
+                                : 'bg-rose-600'
                             }`}
                           >
                             {c.member.firstName[0]}
@@ -280,12 +316,16 @@ export const FinancesView: React.FC<FinancesViewProps> = ({
                     {c.member ? (
                       <span
                         className={`px-2 py-0.5 rounded text-[10px] font-extrabold uppercase ${
-                          c.member.churchGroup === 'GROUP_1'
+                          c.member.churchGroup === 'JOY'
+                            ? 'bg-amber-100 text-amber-800'
+                            : c.member.churchGroup === 'FAITH'
                             ? 'bg-blue-100 text-blue-800'
-                            : 'bg-purple-100 text-purple-800'
+                            : c.member.churchGroup === 'HOPE'
+                            ? 'bg-emerald-100 text-emerald-800'
+                            : 'bg-rose-100 text-rose-800'
                         }`}
                       >
-                        {c.member.churchGroup === 'GROUP_1' ? 'Group 1' : 'Group 2'}
+                        {c.member.churchGroup}
                       </span>
                     ) : (
                       <span className="text-slate-400">-</span>
@@ -364,7 +404,7 @@ export const FinancesView: React.FC<FinancesViewProps> = ({
                   <option value="">General Offering / Anonymous</option>
                   {members.map((m) => (
                     <option key={m.id} value={m.id}>
-                      {m.firstName} {m.lastName} ({m.churchGroup === 'GROUP_1' ? 'Group 1' : 'Group 2'})
+                      {m.firstName} {m.lastName} ({m.churchGroup} Cell)
                     </option>
                   ))}
                 </select>

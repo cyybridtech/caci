@@ -399,13 +399,17 @@ export const CampaignsView: React.FC<CampaignsViewProps> = ({ members, onOpenRec
                             <span>{donorName}</span>
                             {pledge.member && (
                               <span
-                                className={`px-1.5 py-0.2 rounded text-[9px] font-extrabold ${
-                                  pledge.member.churchGroup === 'GROUP_1'
+                                className={`px-1.5 py-0.2 rounded text-[9px] font-extrabold uppercase ${
+                                  pledge.member.churchGroup === 'JOY'
+                                    ? 'bg-amber-100 text-amber-800'
+                                    : pledge.member.churchGroup === 'FAITH'
                                     ? 'bg-blue-100 text-blue-800'
-                                    : 'bg-purple-100 text-purple-800'
+                                    : pledge.member.churchGroup === 'HOPE'
+                                    ? 'bg-emerald-100 text-emerald-800'
+                                    : 'bg-rose-100 text-rose-800'
                                 }`}
                               >
-                                {pledge.member.churchGroup === 'GROUP_1' ? 'G1' : 'G2'}
+                                {pledge.member.churchGroup}
                               </span>
                             )}
                           </div>
@@ -567,7 +571,7 @@ export const CampaignsView: React.FC<CampaignsViewProps> = ({ members, onOpenRec
                   <option value="">-- External Donor / Enter Manually --</option>
                   {members.map((m) => (
                     <option key={m.id} value={m.id}>
-                      {m.firstName} {m.lastName} ({m.churchGroup === 'GROUP_1' ? 'G1' : 'G2'})
+                      {m.firstName} {m.lastName} ({m.churchGroup} Cell)
                     </option>
                   ))}
                 </select>

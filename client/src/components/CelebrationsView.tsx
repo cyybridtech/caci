@@ -309,7 +309,7 @@ export const CelebrationsView: React.FC<CelebrationsViewProps> = ({ onSendMessag
                         </span>
                       </div>
                       <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-white border text-slate-600 shrink-0">
-                        {u.churchGroup === 'GROUP_1' ? 'G1' : 'G2'}
+                        {u.churchGroup}
                       </span>
                     </div>
                   );

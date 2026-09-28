@@ -146,7 +146,13 @@ export const DepartmentsView: React.FC<DepartmentsViewProps> = ({
                       <div className="flex items-center space-x-3">
                         <div
                           className={`w-8 h-8 rounded-lg flex items-center justify-center font-bold text-white text-xs ${
-                            member.churchGroup === 'GROUP_1' ? 'bg-blue-600' : 'bg-purple-600'
+                            member.churchGroup === 'JOY'
+                              ? 'bg-amber-500'
+                              : member.churchGroup === 'FAITH'
+                              ? 'bg-blue-600'
+                              : member.churchGroup === 'HOPE'
+                              ? 'bg-emerald-600'
+                              : 'bg-rose-600'
                           }`}
                         >
                           {member.firstName[0]}
@@ -164,13 +170,17 @@ export const DepartmentsView: React.FC<DepartmentsViewProps> = ({
 
                       <div className="flex items-center space-x-2">
                         <span
-                          className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                            member.churchGroup === 'GROUP_1'
+                          className={`px-2 py-0.5 rounded text-[10px] font-extrabold uppercase ${
+                            member.churchGroup === 'JOY'
+                              ? 'bg-amber-100 text-amber-800'
+                              : member.churchGroup === 'FAITH'
                               ? 'bg-blue-100 text-blue-800'
-                              : 'bg-purple-100 text-purple-800'
+                              : member.churchGroup === 'HOPE'
+                              ? 'bg-emerald-100 text-emerald-800'
+                              : 'bg-rose-100 text-rose-800'
                           }`}
                         >
-                          {member.churchGroup === 'GROUP_1' ? 'Group 1' : 'Group 2'}
+                          {member.churchGroup}
                         </span>
                         <span className="px-2 py-0.5 rounded bg-slate-200 text-slate-700 font-medium text-[10px]">
                           {member.role}

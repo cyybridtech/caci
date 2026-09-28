@@ -83,9 +83,15 @@ export const ReceiptModal: React.FC<ReceiptModalProps> = ({ contribution, onClos
 
             {contribution.member && (
               <div className="flex justify-between py-1 border-b border-slate-100">
-                <span className="text-slate-500 font-medium">Church Group:</span>
+                <span className="text-slate-500 font-medium">Church Cell:</span>
                 <span className="font-semibold text-blue-700">
-                  {contribution.member.churchGroup === 'GROUP_1' ? 'Group 1' : 'Group 2'}
+                  {contribution.member.churchGroup === 'JOY'
+                    ? 'Joy Cell'
+                    : contribution.member.churchGroup === 'FAITH'
+                    ? 'Faith Cell'
+                    : contribution.member.churchGroup === 'HOPE'
+                    ? 'Hope Cell'
+                    : 'Love Cell'}
                 </span>
               </div>
             )}

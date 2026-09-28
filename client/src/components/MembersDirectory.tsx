@@ -526,7 +526,13 @@ export const MembersDirectory: React.FC<MembersDirectoryProps> = ({
                     ) : (
                       <div
                         className={`w-20 h-20 rounded-2xl flex items-center justify-center font-extrabold text-2xl text-white shadow-md shrink-0 ${
-                          selectedMember.churchGroup === 'GROUP_1' ? 'bg-blue-600' : 'bg-purple-600'
+                          selectedMember.churchGroup === 'JOY'
+                            ? 'bg-amber-500'
+                            : selectedMember.churchGroup === 'FAITH'
+                            ? 'bg-blue-600'
+                            : selectedMember.churchGroup === 'HOPE'
+                            ? 'bg-emerald-600'
+                            : 'bg-rose-600'
                         }`}
                       >
                         {selectedMember.firstName[0]}
@@ -541,12 +547,22 @@ export const MembersDirectory: React.FC<MembersDirectoryProps> = ({
                         </h2>
                         <span
                           className={`px-2 py-0.5 rounded text-[10px] font-extrabold uppercase ${
-                            selectedMember.churchGroup === 'GROUP_1'
+                            selectedMember.churchGroup === 'JOY'
+                              ? 'bg-amber-100 text-amber-800'
+                              : selectedMember.churchGroup === 'FAITH'
                               ? 'bg-blue-100 text-blue-800'
-                              : 'bg-purple-100 text-purple-800'
+                              : selectedMember.churchGroup === 'HOPE'
+                              ? 'bg-emerald-100 text-emerald-800'
+                              : 'bg-rose-100 text-rose-800'
                           }`}
                         >
-                          {selectedMember.churchGroup === 'GROUP_1' ? 'Group 1' : 'Group 2'}
+                          {selectedMember.churchGroup === 'JOY'
+                            ? 'Joy Cell'
+                            : selectedMember.churchGroup === 'FAITH'
+                            ? 'Faith Cell'
+                            : selectedMember.churchGroup === 'HOPE'
+                            ? 'Hope Cell'
+                            : 'Love Cell'}
                         </span>
                       </div>
                       <p className="text-xs text-slate-500 font-semibold mt-0.5">
