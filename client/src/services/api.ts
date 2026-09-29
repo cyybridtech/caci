@@ -468,6 +468,39 @@ export const api = {
     return res.json();
   },
 
+  async updateCampaign(campaignId: string, data: {
+    title?: string;
+    description?: string;
+    targetAmount?: number;
+    category?: string;
+    status?: string;
+    startDate?: string;
+    endDate?: string;
+  }): Promise<PledgeCampaign> {
+    const res = await fetch(`${BASE_URL}/campaigns/${campaignId}`, {
+      method: 'PUT',
+      headers: getAuthHeaders(),
+      body: JSON.stringify(data)
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: 'Failed to update campaign' }));
+      throw new Error(err.message || err.error || 'Failed to update campaign');
+    }
+    return res.json();
+  },
+
+  async deleteCampaign(campaignId: string): Promise<{ success: boolean; message?: string }> {
+    const res = await fetch(`${BASE_URL}/campaigns/${campaignId}`, {
+      method: 'DELETE',
+      headers: getAuthHeaders()
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: 'Failed to delete campaign' }));
+      throw new Error(err.message || err.error || 'Failed to delete campaign');
+    }
+    return res.json();
+  },
+
   async createPledge(campaignId: string, data: {
     memberId?: string;
     donorName?: string;

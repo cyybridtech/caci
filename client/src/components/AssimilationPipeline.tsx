@@ -12,6 +12,7 @@ import {
   ExternalLink
 } from 'lucide-react';
 import { Member, AssimilationStage, ChurchGroup } from '../types/index.ts';
+import { useAuth } from '../context/AuthContext.tsx';
 
 interface AssimilationPipelineProps {
   members: Member[];
@@ -22,6 +23,9 @@ export const AssimilationPipeline: React.FC<AssimilationPipelineProps> = ({
   members,
   onUpdateStage
 }) => {
+  const { user } = useAuth();
+  const isCellLeader = user?.role === 'CELL_LEADER';
+  const assignedCell = isCellLeader ? user?.cell : null;
   const visitors = members.filter((m) => m.role === 'First-Timer' || m.assimilationStage !== 'REGULAR_MEMBER');
 
   const stages: { key: AssimilationStage; title: string; desc: string; color: string }[] = [
@@ -186,32 +190,49 @@ export const AssimilationPipeline: React.FC<AssimilationPipelineProps> = ({
                           {stage.key === 'HOME_VISIT' && (
                             <div className="w-full space-y-1.5">
                               <div className="text-[10px] font-bold text-slate-500">Assign Final Cell:</div>
-                              <div className="grid grid-cols-2 gap-1.5">
+                              {isCellLeader && assignedCell ? (
                                 <button
-                                  onClick={() => onUpdateStage(member.id, 'ASSIGNED_GROUP', 'JOY')}
-                                  className="py-1 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold rounded text-[10px] transition"
+                                  onClick={() => onUpdateStage(member.id, 'ASSIGNED_GROUP', assignedCell)}
+                                  className={`w-full py-1.5 font-bold rounded text-xs transition ${
+                                    assignedCell === 'JOY'
+                                      ? 'bg-amber-500 hover:bg-amber-400 text-slate-950'
+                                      : assignedCell === 'FAITH'
+                                      ? 'bg-blue-600 hover:bg-blue-500 text-white'
+                                      : assignedCell === 'HOPE'
+                                      ? 'bg-emerald-600 hover:bg-emerald-500 text-white'
+                                      : 'bg-rose-600 hover:bg-rose-500 text-white'
+                                  }`}
                                 >
-                                  Joy Cell
+                                  Assign to {assignedCell} Cell
                                 </button>
-                                <button
-                                  onClick={() => onUpdateStage(member.id, 'ASSIGNED_GROUP', 'FAITH')}
-                                  className="py-1 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded text-[10px] transition"
-                                >
-                                  Faith Cell
-                                </button>
-                                <button
-                                  onClick={() => onUpdateStage(member.id, 'ASSIGNED_GROUP', 'HOPE')}
-                                  className="py-1 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded text-[10px] transition"
-                                >
-                                  Hope Cell
-                                </button>
-                                <button
-                                  onClick={() => onUpdateStage(member.id, 'ASSIGNED_GROUP', 'LOVE')}
-                                  className="py-1 bg-rose-600 hover:bg-rose-500 text-white font-bold rounded text-[10px] transition"
-                                >
-                                  Love Cell
-                                </button>
-                              </div>
+                              ) : (
+                                <div className="grid grid-cols-2 gap-1.5">
+                                  <button
+                                    onClick={() => onUpdateStage(member.id, 'ASSIGNED_GROUP', 'JOY')}
+                                    className="py-1 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold rounded text-[10px] transition"
+                                  >
+                                    Joy Cell
+                                  </button>
+                                  <button
+                                    onClick={() => onUpdateStage(member.id, 'ASSIGNED_GROUP', 'FAITH')}
+                                    className="py-1 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded text-[10px] transition"
+                                  >
+                                    Faith Cell
+                                  </button>
+                                  <button
+                                    onClick={() => onUpdateStage(member.id, 'ASSIGNED_GROUP', 'HOPE')}
+                                    className="py-1 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded text-[10px] transition"
+                                  >
+                                    Hope Cell
+                                  </button>
+                                  <button
+                                    onClick={() => onUpdateStage(member.id, 'ASSIGNED_GROUP', 'LOVE')}
+                                    className="py-1 bg-rose-600 hover:bg-rose-500 text-white font-bold rounded text-[10px] transition"
+                                  >
+                                    Love Cell
+                                  </button>
+                                </div>
+                              )}
                             </div>
                           )}
 

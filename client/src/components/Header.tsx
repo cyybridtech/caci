@@ -255,19 +255,19 @@ export const Header: React.FC<HeaderProps> = ({
 
       {/* Navigation Tabs */}
       <div className="max-w-7xl mx-auto px-2 sm:px-4 lg:px-8 py-2 border-t border-slate-800">
-        <nav className="flex flex-wrap gap-1 bg-slate-950/60 p-1.5 rounded-2xl border border-slate-800/80 shadow-inner">
+        <nav className="flex overflow-x-auto scrollbar-none gap-1 bg-slate-950/60 p-1.5 rounded-2xl border border-slate-800/80 shadow-inner sm:flex-wrap">
           {/* 1. Check-In */}
           {isRoleAuthorizedForTab('checkin') && (
             <button
               onClick={() => setActiveTab('checkin')}
-              className={`flex-1 min-w-[70px] flex flex-col sm:flex-row items-center justify-center space-y-0.5 sm:space-y-0 sm:space-x-1.5 px-2 py-2 rounded-xl text-xs font-bold transition duration-150 ${
+              className={`shrink-0 sm:flex-1 min-w-[80px] sm:min-w-[70px] flex items-center justify-center space-x-1.5 px-3 py-2 rounded-xl text-xs font-bold transition duration-150 whitespace-nowrap ${
                 activeTab === 'checkin'
                   ? 'bg-blue-600 text-white shadow-md shadow-blue-900/30'
                   : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
               }`}
             >
               <CheckCircle2 className="w-4 h-4 shrink-0" />
-              <span className="truncate">Check-In</span>
+              <span>Check-In</span>
             </button>
           )}
 
@@ -275,14 +275,14 @@ export const Header: React.FC<HeaderProps> = ({
           {isRoleAuthorizedForTab('members') && (
             <button
               onClick={() => setActiveTab('members')}
-              className={`flex-1 min-w-[70px] flex flex-col sm:flex-row items-center justify-center space-y-0.5 sm:space-y-0 sm:space-x-1.5 px-2 py-2 rounded-xl text-xs font-bold transition duration-150 ${
+              className={`shrink-0 sm:flex-1 min-w-[80px] sm:min-w-[70px] flex items-center justify-center space-x-1.5 px-3 py-2 rounded-xl text-xs font-bold transition duration-150 whitespace-nowrap ${
                 activeTab === 'members'
                   ? 'bg-blue-600 text-white shadow-md shadow-blue-900/30'
                   : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
               }`}
             >
               <Users className="w-4 h-4 shrink-0" />
-              <span className="truncate">Members</span>
+              <span>Members</span>
             </button>
           )}
 
@@ -290,14 +290,14 @@ export const Header: React.FC<HeaderProps> = ({
           {isRoleAuthorizedForTab('attendance-history') && (
             <button
               onClick={() => setActiveTab('attendance-history')}
-              className={`flex-1 min-w-[70px] flex flex-col sm:flex-row items-center justify-center space-y-0.5 sm:space-y-0 sm:space-x-1.5 px-2 py-2 rounded-xl text-xs font-bold transition duration-150 ${
+              className={`shrink-0 sm:flex-1 min-w-[80px] sm:min-w-[70px] flex items-center justify-center space-x-1.5 px-3 py-2 rounded-xl text-xs font-bold transition duration-150 whitespace-nowrap ${
                 activeTab === 'attendance-history'
                   ? 'bg-amber-600 text-white shadow-md shadow-amber-900/30'
                   : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
               }`}
             >
               <History className="w-4 h-4 shrink-0" />
-              <span className="truncate">Audit</span>
+              <span>Audit</span>
             </button>
           )}
 
@@ -305,14 +305,14 @@ export const Header: React.FC<HeaderProps> = ({
           {isRoleAuthorizedForTab('pipeline') && (
             <button
               onClick={() => setActiveTab('pipeline')}
-              className={`flex-1 min-w-[70px] flex flex-col sm:flex-row items-center justify-center space-y-0.5 sm:space-y-0 sm:space-x-1.5 px-2 py-2 rounded-xl text-xs font-bold transition duration-150 ${
+              className={`shrink-0 sm:flex-1 min-w-[80px] sm:min-w-[70px] flex items-center justify-center space-x-1.5 px-3 py-2 rounded-xl text-xs font-bold transition duration-150 whitespace-nowrap ${
                 activeTab === 'pipeline'
                   ? 'bg-amber-600 text-white shadow-md shadow-amber-900/30'
                   : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
               }`}
             >
               <UserCheck className="w-4 h-4 shrink-0" />
-              <span className="truncate">Visitors</span>
+              <span>Visitors</span>
             </button>
           )}
 
@@ -320,14 +320,14 @@ export const Header: React.FC<HeaderProps> = ({
           {isRoleAuthorizedForTab('departments') && (
             <button
               onClick={() => setActiveTab('departments')}
-              className={`flex-1 min-w-[70px] flex flex-col sm:flex-row items-center justify-center space-y-0.5 sm:space-y-0 sm:space-x-1.5 px-2 py-2 rounded-xl text-xs font-bold transition duration-150 ${
+              className={`shrink-0 sm:flex-1 min-w-[80px] sm:min-w-[70px] flex items-center justify-center space-x-1.5 px-3 py-2 rounded-xl text-xs font-bold transition duration-150 whitespace-nowrap ${
                 activeTab === 'departments'
                   ? 'bg-purple-600 text-white shadow-md shadow-purple-900/30'
                   : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
               }`}
             >
               <Building2 className="w-4 h-4 shrink-0" />
-              <span className="truncate">Auxiliaries</span>
+              <span>Auxiliaries</span>
             </button>
           )}
 
@@ -335,14 +335,14 @@ export const Header: React.FC<HeaderProps> = ({
           {isRoleAuthorizedForTab('finances') && (
             <button
               onClick={() => setActiveTab('finances')}
-              className={`flex-1 min-w-[70px] flex flex-col sm:flex-row items-center justify-center space-y-0.5 sm:space-y-0 sm:space-x-1.5 px-2 py-2 rounded-xl text-xs font-bold transition duration-150 ${
+              className={`shrink-0 sm:flex-1 min-w-[80px] sm:min-w-[70px] flex items-center justify-center space-x-1.5 px-3 py-2 rounded-xl text-xs font-bold transition duration-150 whitespace-nowrap ${
                 activeTab === 'finances'
                   ? 'bg-emerald-600 text-white shadow-md shadow-emerald-900/30'
                   : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
               }`}
             >
               <DollarSign className="w-4 h-4 shrink-0" />
-              <span className="truncate">Finances</span>
+              <span>Finances</span>
             </button>
           )}
 
@@ -350,14 +350,14 @@ export const Header: React.FC<HeaderProps> = ({
           {isRoleAuthorizedForTab('campaigns') && (
             <button
               onClick={() => setActiveTab('campaigns')}
-              className={`flex-1 min-w-[70px] flex flex-col sm:flex-row items-center justify-center space-y-0.5 sm:space-y-0 sm:space-x-1.5 px-2 py-2 rounded-xl text-xs font-bold transition duration-150 ${
+              className={`shrink-0 sm:flex-1 min-w-[80px] sm:min-w-[70px] flex items-center justify-center space-x-1.5 px-3 py-2 rounded-xl text-xs font-bold transition duration-150 whitespace-nowrap ${
                 activeTab === 'campaigns'
                   ? 'bg-indigo-600 text-white shadow-md shadow-indigo-900/30'
                   : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
               }`}
             >
               <Building className="w-4 h-4 shrink-0" />
-              <span className="truncate">Pledges</span>
+              <span>Pledges</span>
             </button>
           )}
 
@@ -365,7 +365,7 @@ export const Header: React.FC<HeaderProps> = ({
           {isRoleAuthorizedForTab('celebrations') && (
             <button
               onClick={() => setActiveTab('celebrations')}
-              className={`flex-1 min-w-[70px] flex flex-col sm:flex-row items-center justify-center space-y-0.5 sm:space-y-0 sm:space-x-1.5 px-2 py-2 rounded-xl text-xs font-bold transition duration-150 relative ${
+              className={`shrink-0 sm:flex-1 min-w-[80px] sm:min-w-[70px] flex items-center justify-center space-x-1.5 px-3 py-2 rounded-xl text-xs font-bold transition duration-150 whitespace-nowrap relative ${
                 activeTab === 'celebrations'
                   ? 'bg-rose-600 text-white shadow-md shadow-rose-900/30'
                   : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
@@ -377,7 +377,7 @@ export const Header: React.FC<HeaderProps> = ({
                   <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-rose-400 animate-pulse"></span>
                 )}
               </div>
-              <span className="truncate">Celebrations</span>
+              <span>Celebrations</span>
             </button>
           )}
 
@@ -385,14 +385,14 @@ export const Header: React.FC<HeaderProps> = ({
           {isRoleAuthorizedForTab('messaging') && (
             <button
               onClick={() => setActiveTab('messaging')}
-              className={`flex-1 min-w-[70px] flex flex-col sm:flex-row items-center justify-center space-y-0.5 sm:space-y-0 sm:space-x-1.5 px-2 py-2 rounded-xl text-xs font-bold transition duration-150 ${
+              className={`shrink-0 sm:flex-1 min-w-[80px] sm:min-w-[70px] flex items-center justify-center space-x-1.5 px-3 py-2 rounded-xl text-xs font-bold transition duration-150 whitespace-nowrap ${
                 activeTab === 'messaging'
                   ? 'bg-cyan-600 text-white shadow-md shadow-cyan-900/30'
                   : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
               }`}
             >
               <MessageSquare className="w-4 h-4 shrink-0" />
-              <span className="truncate">SMS Broadcast</span>
+              <span>SMS Broadcast</span>
             </button>
           )}
 
@@ -400,14 +400,14 @@ export const Header: React.FC<HeaderProps> = ({
           {isRoleAuthorizedForTab('analytics') && (
             <button
               onClick={() => setActiveTab('analytics')}
-              className={`flex-1 min-w-[70px] flex flex-col sm:flex-row items-center justify-center space-y-0.5 sm:space-y-0 sm:space-x-1.5 px-2 py-2 rounded-xl text-xs font-bold transition duration-150 ${
+              className={`shrink-0 sm:flex-1 min-w-[80px] sm:min-w-[70px] flex items-center justify-center space-x-1.5 px-3 py-2 rounded-xl text-xs font-bold transition duration-150 whitespace-nowrap ${
                 activeTab === 'analytics'
                   ? 'bg-blue-700 text-white shadow-md shadow-blue-950/40'
                   : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
               }`}
             >
               <TrendingUp className="w-4 h-4 shrink-0" />
-              <span className="truncate">Analytics</span>
+              <span>Analytics</span>
             </button>
           )}
 
@@ -415,14 +415,14 @@ export const Header: React.FC<HeaderProps> = ({
           {isRoleAuthorizedForTab('users') && (
             <button
               onClick={() => setActiveTab('users')}
-              className={`flex-1 min-w-[70px] flex flex-col sm:flex-row items-center justify-center space-y-0.5 sm:space-y-0 sm:space-x-1.5 px-2 py-2 rounded-xl text-xs font-bold transition duration-150 ${
+              className={`shrink-0 sm:flex-1 min-w-[80px] sm:min-w-[70px] flex items-center justify-center space-x-1.5 px-3 py-2 rounded-xl text-xs font-bold transition duration-150 whitespace-nowrap ${
                 activeTab === 'users'
                   ? 'bg-red-600 text-white shadow-md shadow-red-900/30'
                   : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
               }`}
             >
               <Shield className="w-4 h-4 shrink-0" />
-              <span className="truncate">Users</span>
+              <span>Users</span>
             </button>
           )}
         </nav>

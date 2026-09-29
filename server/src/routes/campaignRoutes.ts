@@ -143,6 +143,77 @@ campaignRouter.get('/:id', async (req: Request, res: Response) => {
   }
 });
 
+// PUT /api/campaigns/:id - update campaign
+campaignRouter.put('/:id', async (req: Request, res: Response) => {
+  try {
+    const id = req.params.id as string;
+    const { title, description, targetAmount, category, status, startDate, endDate } = req.body;
+
+    const existing = await prisma.pledgeCampaign.findUnique({ where: { id } });
+    if (!existing) {
+      return res.status(404).json({ error: 'Campaign not found' });
+    }
+
+    const updated = await prisma.pledgeCampaign.update({
+      where: { id },
+      data: {
+        title: title !== undefined ? title.trim() : undefined,
+        description: description !== undefined ? (description ? description.trim() : null) : undefined,
+        targetAmount: targetAmount !== undefined ? Number(targetAmount) : undefined,
+        category: category !== undefined ? category : undefined,
+        status: status !== undefined ? status : undefined,
+        startDate: startDate !== undefined ? (startDate ? new Date(startDate) : undefined) : undefined,
+        endDate: endDate !== undefined ? (endDate ? new Date(endDate) : null) : undefined,
+      }
+    });
+
+    res.json(updated);
+  } catch (error: any) {
+    console.error('Error updating campaign:', error);
+    res.status(500).json({ error: 'Failed to update campaign' });
+  }
+});
+
+// DELETE /api/campaigns/:id - delete campaign
+campaignRouter.delete('/:id', async (req: Request, res: Response) => {
+  try {
+    const id = req.params.id as string;
+
+    const existing = await prisma.pledgeCampaign.findUnique({ where: { id } });
+    if (!existing) {
+      return res.status(404).json({ error: 'Campaign not found' });
+    }
+
+    // Find all pledges belonging to this campaign
+    const pledges = await prisma.memberPledge.findMany({
+      where: { campaignId: id },
+      select: { id: true }
+    });
+    const pledgeIds = pledges.map((p) => p.id);
+
+    if (pledgeIds.length > 0) {
+      // Delete payments
+      await prisma.pledgePayment.deleteMany({
+        where: { pledgeId: { in: pledgeIds } }
+      });
+      // Delete pledges
+      await prisma.memberPledge.deleteMany({
+        where: { id: { in: pledgeIds } }
+      });
+    }
+
+    // Delete campaign
+    await prisma.pledgeCampaign.delete({
+      where: { id }
+    });
+
+    res.json({ success: true, message: 'Campaign deleted successfully' });
+  } catch (error: any) {
+    console.error('Error deleting campaign:', error);
+    res.status(500).json({ error: 'Failed to delete campaign' });
+  }
+});
+
 // POST /api/campaigns/:id/pledges - add a member pledge
 campaignRouter.post('/:id/pledges', async (req: Request, res: Response) => {
   try {

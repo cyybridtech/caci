@@ -10,26 +10,36 @@ attendanceRouter.use(requireAuth);
 // GET /api/attendance/analytics - executive pastoral analytics & 4-cell growth/drop trends
 attendanceRouter.get('/analytics', async (req: Request, res: Response) => {
   try {
-    const totalMembers = await prisma.member.count({ where: { status: 'ACTIVE' } });
-    const joyTotal = await prisma.member.count({ where: { status: 'ACTIVE', churchGroup: ChurchGroup.JOY } });
-    const faithTotal = await prisma.member.count({ where: { status: 'ACTIVE', churchGroup: ChurchGroup.FAITH } });
-    const hopeTotal = await prisma.member.count({ where: { status: 'ACTIVE', churchGroup: ChurchGroup.HOPE } });
-    const loveTotal = await prisma.member.count({ where: { status: 'ACTIVE', churchGroup: ChurchGroup.LOVE } });
-
-    // Fetch up to 24 service sessions for rich weekly and monthly analytics
-    const allSessions = await prisma.serviceSession.findMany({
-      orderBy: { serviceDate: 'desc' },
-      take: 24,
-      include: {
-        attendance: {
-          include: {
-            member: {
-              select: { id: true, firstName: true, lastName: true, churchGroup: true, phone: true }
+    const [totalMembers, groupCounts, allSessions] = await Promise.all([
+      prisma.member.count({ where: { status: 'ACTIVE' } }),
+      prisma.member.groupBy({
+        by: ['churchGroup'],
+        where: { status: 'ACTIVE' },
+        _count: { _all: true }
+      }),
+      prisma.serviceSession.findMany({
+        orderBy: { serviceDate: 'desc' },
+        take: 24,
+        include: {
+          attendance: {
+            include: {
+              member: {
+                select: { id: true, firstName: true, lastName: true, churchGroup: true, phone: true }
+              }
             }
           }
         }
-      }
+      })
+    ]);
+
+    const countMap: Record<string, number> = {};
+    groupCounts.forEach((g: any) => {
+      countMap[g.churchGroup] = g._count._all;
     });
+    const joyTotal = countMap[ChurchGroup.JOY] || 0;
+    const faithTotal = countMap[ChurchGroup.FAITH] || 0;
+    const hopeTotal = countMap[ChurchGroup.HOPE] || 0;
+    const loveTotal = countMap[ChurchGroup.LOVE] || 0;
 
     // 1. Weekly Trends (Last 10 sessions in chronological order)
     const recentSessions = allSessions.slice(0, 10).reverse();
@@ -436,20 +446,31 @@ attendanceRouter.get('/stats/:sessionId', async (req: Request, res: Response) =>
   try {
     const sessionId = req.params.sessionId as string;
 
-    const totalMembers = await prisma.member.count({ where: { status: 'ACTIVE' } });
-    const joyTotal = await prisma.member.count({ where: { status: 'ACTIVE', churchGroup: ChurchGroup.JOY } });
-    const faithTotal = await prisma.member.count({ where: { status: 'ACTIVE', churchGroup: ChurchGroup.FAITH } });
-    const hopeTotal = await prisma.member.count({ where: { status: 'ACTIVE', churchGroup: ChurchGroup.HOPE } });
-    const loveTotal = await prisma.member.count({ where: { status: 'ACTIVE', churchGroup: ChurchGroup.LOVE } });
-
-    const checkedInRecords = await prisma.attendanceRecord.findMany({
-      where: { sessionId },
-      include: {
-        member: {
-          select: { churchGroup: true }
+    const [totalMembers, groupCounts, checkedInRecords] = await Promise.all([
+      prisma.member.count({ where: { status: 'ACTIVE' } }),
+      prisma.member.groupBy({
+        by: ['churchGroup'],
+        where: { status: 'ACTIVE' },
+        _count: { _all: true }
+      }),
+      prisma.attendanceRecord.findMany({
+        where: { sessionId },
+        include: {
+          member: {
+            select: { churchGroup: true }
+          }
         }
-      }
+      })
+    ]);
+
+    const countMap: Record<string, number> = {};
+    groupCounts.forEach((g: any) => {
+      countMap[g.churchGroup] = g._count._all;
     });
+    const joyTotal = countMap[ChurchGroup.JOY] || 0;
+    const faithTotal = countMap[ChurchGroup.FAITH] || 0;
+    const hopeTotal = countMap[ChurchGroup.HOPE] || 0;
+    const loveTotal = countMap[ChurchGroup.LOVE] || 0;
 
     const totalPresent = checkedInRecords.length;
     const joyPresent = checkedInRecords.filter(r => r.member.churchGroup === ChurchGroup.JOY).length;

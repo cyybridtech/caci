@@ -9,6 +9,7 @@ import {
   Filter
 } from 'lucide-react';
 import { Member, ChurchGroup } from '../types/index.ts';
+import { useAuth } from '../context/AuthContext.tsx';
 
 interface AttendanceAuditViewProps {
   members: Member[];
@@ -19,8 +20,20 @@ export const AttendanceAuditView: React.FC<AttendanceAuditViewProps> = ({
   members,
   onInspectMemberHistory
 }) => {
+  const { user } = useAuth();
+  const isCellLeader = user?.role === 'CELL_LEADER';
+  const assignedCell = isCellLeader ? user?.cell : null;
+
   const [searchTerm, setSearchTerm] = useState('');
-  const [groupFilter, setGroupFilter] = useState<'ALL' | 'JOY' | 'FAITH' | 'HOPE' | 'LOVE'>('ALL');
+  const [groupFilter, setGroupFilter] = useState<'ALL' | 'JOY' | 'FAITH' | 'HOPE' | 'LOVE'>(
+    assignedCell || 'ALL'
+  );
+
+  React.useEffect(() => {
+    if (assignedCell) {
+      setGroupFilter(assignedCell);
+    }
+  }, [assignedCell]);
 
   const filteredMembers = members.filter((m) => {
     if (groupFilter !== 'ALL' && m.churchGroup !== groupFilter) return false;
@@ -88,48 +101,55 @@ export const AttendanceAuditView: React.FC<AttendanceAuditViewProps> = ({
         </div>
 
         {/* Cell Filter */}
-        <div className="flex flex-wrap items-center gap-1.5 bg-slate-100 p-1.5 rounded-2xl">
-          <button
-            onClick={() => setGroupFilter('ALL')}
-            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition ${
-              groupFilter === 'ALL' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600 hover:text-slate-900'
-            }`}
-          >
-            All Cells ({members.length})
-          </button>
-          <button
-            onClick={() => setGroupFilter('JOY')}
-            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition ${
-              groupFilter === 'JOY' ? 'bg-amber-500 text-slate-950 shadow-sm' : 'text-amber-800 hover:bg-amber-100/50'
-            }`}
-          >
-            Joy ({members.filter((m) => m.churchGroup === 'JOY').length})
-          </button>
-          <button
-            onClick={() => setGroupFilter('FAITH')}
-            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition ${
-              groupFilter === 'FAITH' ? 'bg-blue-600 text-white shadow-sm' : 'text-blue-800 hover:bg-blue-100/50'
-            }`}
-          >
-            Faith ({members.filter((m) => m.churchGroup === 'FAITH').length})
-          </button>
-          <button
-            onClick={() => setGroupFilter('HOPE')}
-            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition ${
-              groupFilter === 'HOPE' ? 'bg-emerald-600 text-white shadow-sm' : 'text-emerald-800 hover:bg-emerald-100/50'
-            }`}
-          >
-            Hope ({members.filter((m) => m.churchGroup === 'HOPE').length})
-          </button>
-          <button
-            onClick={() => setGroupFilter('LOVE')}
-            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition ${
-              groupFilter === 'LOVE' ? 'bg-rose-600 text-white shadow-sm' : 'text-rose-800 hover:bg-rose-100/50'
-            }`}
-          >
-            Love ({members.filter((m) => m.churchGroup === 'LOVE').length})
-          </button>
-        </div>
+        {!isCellLeader ? (
+          <div className="flex flex-wrap items-center gap-1.5 bg-slate-100 p-1.5 rounded-2xl">
+            <button
+              onClick={() => setGroupFilter('ALL')}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition ${
+                groupFilter === 'ALL' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              All Cells ({members.length})
+            </button>
+            <button
+              onClick={() => setGroupFilter('JOY')}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition ${
+                groupFilter === 'JOY' ? 'bg-amber-500 text-slate-950 shadow-sm' : 'text-amber-800 hover:bg-amber-100/50'
+              }`}
+            >
+              Joy ({members.filter((m) => m.churchGroup === 'JOY').length})
+            </button>
+            <button
+              onClick={() => setGroupFilter('FAITH')}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition ${
+                groupFilter === 'FAITH' ? 'bg-blue-600 text-white shadow-sm' : 'text-blue-800 hover:bg-blue-100/50'
+              }`}
+            >
+              Faith ({members.filter((m) => m.churchGroup === 'FAITH').length})
+            </button>
+            <button
+              onClick={() => setGroupFilter('HOPE')}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition ${
+                groupFilter === 'HOPE' ? 'bg-emerald-600 text-white shadow-sm' : 'text-emerald-800 hover:bg-emerald-100/50'
+              }`}
+            >
+              Hope ({members.filter((m) => m.churchGroup === 'HOPE').length})
+            </button>
+            <button
+              onClick={() => setGroupFilter('LOVE')}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition ${
+                groupFilter === 'LOVE' ? 'bg-rose-600 text-white shadow-sm' : 'text-rose-800 hover:bg-rose-100/50'
+              }`}
+            >
+              Love ({members.filter((m) => m.churchGroup === 'LOVE').length})
+            </button>
+          </div>
+        ) : (
+          <div className="flex items-center space-x-2 bg-slate-100 px-3 py-1.5 rounded-2xl text-xs font-extrabold text-slate-700">
+            <span className="w-2.5 h-2.5 rounded-full bg-blue-600"></span>
+            <span>{assignedCell ? `${assignedCell} Cell (${members.length} members)` : 'Your Cell'}</span>
+          </div>
+        )}
       </div>
 
       {/* Members Attendance Audit Grid */}

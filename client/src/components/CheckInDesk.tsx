@@ -17,6 +17,7 @@ import {
 import confetti from 'canvas-confetti';
 import { Member, ServiceSession, AttendanceRecord, AttendanceStats, Department, ChurchGroup } from '../types/index.ts';
 import { playCheckInChime } from '../utils/audio.ts';
+import { useAuth } from '../context/AuthContext.tsx';
 
 interface CheckInDeskProps {
   session: ServiceSession | null;
@@ -41,14 +42,27 @@ export const CheckInDesk: React.FC<CheckInDeskProps> = ({
   onViewMemberHistory,
   isLoading
 }) => {
+  const { user } = useAuth();
+  const isCellLeader = user?.role === 'CELL_LEADER';
+  const assignedCell = isCellLeader ? user?.cell : null;
+
   const [searchTerm, setSearchTerm] = useState('');
-  const [groupFilter, setGroupFilter] = useState<'ALL' | 'JOY' | 'FAITH' | 'HOPE' | 'LOVE'>('ALL');
+  const [groupFilter, setGroupFilter] = useState<'ALL' | 'JOY' | 'FAITH' | 'HOPE' | 'LOVE'>(
+    assignedCell || 'ALL'
+  );
   const [statusFilter, setStatusFilter] = useState<'ALL' | 'PRESENT' | 'ABSENT'>('ALL');
   const [selectedDeptId, setSelectedDeptId] = useState<string>('ALL');
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [selectedIndex, setSelectedIndex] = useState(0);
 
   const searchInputRef = useRef<HTMLInputElement>(null);
+
+  // Sync groupFilter if user cell changes
+  useEffect(() => {
+    if (assignedCell) {
+      setGroupFilter(assignedCell);
+    }
+  }, [assignedCell]);
 
   // Set of checked-in member IDs
   const checkedInIds = new Set(attendanceRecords.map((r) => r.memberId));
@@ -65,7 +79,7 @@ export const CheckInDesk: React.FC<CheckInDeskProps> = ({
         e.preventDefault();
         searchInputRef.current?.focus();
         searchInputRef.current?.select();
-      } else if (!isInputActive) {
+      } else if (!isInputActive && !isCellLeader) {
         if (e.key === '1') {
           setGroupFilter('JOY');
         } else if (e.key === '2') {
@@ -81,7 +95,7 @@ export const CheckInDesk: React.FC<CheckInDeskProps> = ({
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, []);
+  }, [isCellLeader]);
 
   // Filter members
   const filteredMembers = members.filter((member) => {
@@ -166,143 +180,252 @@ export const CheckInDesk: React.FC<CheckInDeskProps> = ({
   return (
     <div className="space-y-6">
       {/* 1. Live Headcount & 4 Cells Breakdown */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3.5">
-        {/* Total Attendance Card */}
-        <div className="bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white p-4 rounded-3xl shadow-lg border border-slate-700/60 relative overflow-hidden">
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] uppercase font-extrabold tracking-wider text-slate-400">
-              Total Attendance
-            </span>
-            <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-blue-500/20 text-blue-300 border border-blue-500/40">
-              {stats?.overallPercentage || 0}%
-            </span>
-          </div>
+      {/* 1. Live Headcount & Cell Breakdown */}
+      {isCellLeader && assignedCell ? (
+        <div className="max-w-md">
+          {assignedCell === 'JOY' && (
+            <div className="bg-white p-5 rounded-3xl shadow-sm border-2 border-amber-300">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-2">
+                  <span className="w-3 h-3 rounded-full bg-amber-500"></span>
+                  <span className="text-xs uppercase font-extrabold tracking-wider text-amber-900">
+                    Joy Cell Attendance
+                  </span>
+                </div>
+                <span className="px-2.5 py-0.5 rounded-full text-xs font-extrabold bg-amber-50 text-amber-800 border border-amber-200">
+                  {joyStat.percentage}% Present
+                </span>
+              </div>
+              <div className="mt-3 flex items-baseline space-x-2">
+                <span className="text-4xl font-extrabold text-amber-700">{joyStat.present}</span>
+                <span className="text-sm text-slate-500 font-semibold">/ {joyStat.total} members</span>
+              </div>
+              <div className="mt-3 w-full bg-amber-100 rounded-full h-2.5 overflow-hidden">
+                <div
+                  className="bg-amber-500 h-2.5 rounded-full transition-all duration-500"
+                  style={{ width: `${Math.min(100, joyStat.percentage)}%` }}
+                ></div>
+              </div>
+            </div>
+          )}
 
-          <div className="mt-2 flex items-baseline space-x-1.5">
-            <span className="text-3xl font-extrabold text-white">
-              {stats?.totalPresent || attendanceRecords.length}
-            </span>
-            <span className="text-xs text-slate-400 font-semibold">
-              / {stats?.totalMembers || members.length}
-            </span>
-          </div>
+          {assignedCell === 'FAITH' && (
+            <div className="bg-white p-5 rounded-3xl shadow-sm border-2 border-blue-300">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-2">
+                  <span className="w-3 h-3 rounded-full bg-blue-600"></span>
+                  <span className="text-xs uppercase font-extrabold tracking-wider text-blue-900">
+                    Faith Cell Attendance
+                  </span>
+                </div>
+                <span className="px-2.5 py-0.5 rounded-full text-xs font-extrabold bg-blue-50 text-blue-700 border border-blue-200">
+                  {faithStat.percentage}% Present
+                </span>
+              </div>
+              <div className="mt-3 flex items-baseline space-x-2">
+                <span className="text-4xl font-extrabold text-blue-700">{faithStat.present}</span>
+                <span className="text-sm text-slate-500 font-semibold">/ {faithStat.total} members</span>
+              </div>
+              <div className="mt-3 w-full bg-blue-100 rounded-full h-2.5 overflow-hidden">
+                <div
+                  className="bg-blue-600 h-2.5 rounded-full transition-all duration-500"
+                  style={{ width: `${Math.min(100, faithStat.percentage)}%` }}
+                ></div>
+              </div>
+            </div>
+          )}
 
-          <div className="mt-2.5 w-full bg-slate-700/60 rounded-full h-2 overflow-hidden">
-            <div
-              className="bg-gradient-to-r from-blue-500 to-emerald-400 h-2 rounded-full transition-all duration-500"
-              style={{ width: `${Math.min(100, stats?.overallPercentage || 0)}%` }}
-            ></div>
-          </div>
+          {assignedCell === 'HOPE' && (
+            <div className="bg-white p-5 rounded-3xl shadow-sm border-2 border-emerald-300">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-2">
+                  <span className="w-3 h-3 rounded-full bg-emerald-600"></span>
+                  <span className="text-xs uppercase font-extrabold tracking-wider text-emerald-900">
+                    Hope Cell Attendance
+                  </span>
+                </div>
+                <span className="px-2.5 py-0.5 rounded-full text-xs font-extrabold bg-emerald-50 text-emerald-800 border border-emerald-200">
+                  {hopeStat.percentage}% Present
+                </span>
+              </div>
+              <div className="mt-3 flex items-baseline space-x-2">
+                <span className="text-4xl font-extrabold text-emerald-700">{hopeStat.present}</span>
+                <span className="text-sm text-slate-500 font-semibold">/ {hopeStat.total} members</span>
+              </div>
+              <div className="mt-3 w-full bg-emerald-100 rounded-full h-2.5 overflow-hidden">
+                <div
+                  className="bg-emerald-600 h-2.5 rounded-full transition-all duration-500"
+                  style={{ width: `${Math.min(100, hopeStat.percentage)}%` }}
+                ></div>
+              </div>
+            </div>
+          )}
+
+          {assignedCell === 'LOVE' && (
+            <div className="bg-white p-5 rounded-3xl shadow-sm border-2 border-rose-300">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-2">
+                  <span className="w-3 h-3 rounded-full bg-rose-600"></span>
+                  <span className="text-xs uppercase font-extrabold tracking-wider text-rose-900">
+                    Love Cell Attendance
+                  </span>
+                </div>
+                <span className="px-2.5 py-0.5 rounded-full text-xs font-extrabold bg-rose-50 text-rose-800 border border-rose-200">
+                  {loveStat.percentage}% Present
+                </span>
+              </div>
+              <div className="mt-3 flex items-baseline space-x-2">
+                <span className="text-4xl font-extrabold text-rose-700">{loveStat.present}</span>
+                <span className="text-sm text-slate-500 font-semibold">/ {loveStat.total} members</span>
+              </div>
+              <div className="mt-3 w-full bg-rose-100 rounded-full h-2.5 overflow-hidden">
+                <div
+                  className="bg-rose-600 h-2.5 rounded-full transition-all duration-500"
+                  style={{ width: `${Math.min(100, loveStat.percentage)}%` }}
+                ></div>
+              </div>
+            </div>
+          )}
         </div>
-
-        {/* Joy Cell Card */}
-        <div className="bg-white p-4 rounded-3xl shadow-sm border-2 border-amber-200 hover:shadow-md transition">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-1.5">
-              <span className="w-2.5 h-2.5 rounded-full bg-amber-500"></span>
-              <span className="text-[11px] uppercase font-extrabold tracking-wider text-amber-900">
-                Joy Cell
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3.5">
+          {/* Total Attendance Card */}
+          <div className="bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white p-4 rounded-3xl shadow-lg border border-slate-700/60 relative overflow-hidden">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] uppercase font-extrabold tracking-wider text-slate-400">
+                Total Attendance
+              </span>
+              <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-blue-500/20 text-blue-300 border border-blue-500/40">
+                {stats?.overallPercentage || 0}%
               </span>
             </div>
-            <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-amber-50 text-amber-800 border border-amber-200">
-              {joyStat.percentage}%
-            </span>
-          </div>
 
-          <div className="mt-2 flex items-baseline space-x-1.5">
-            <span className="text-3xl font-extrabold text-amber-700">{joyStat.present}</span>
-            <span className="text-xs text-slate-500 font-semibold">/ {joyStat.total}</span>
-          </div>
-
-          <div className="mt-2.5 w-full bg-amber-100 rounded-full h-2 overflow-hidden">
-            <div
-              className="bg-amber-500 h-2 rounded-full transition-all duration-500"
-              style={{ width: `${Math.min(100, joyStat.percentage)}%` }}
-            ></div>
-          </div>
-        </div>
-
-        {/* Faith Cell Card */}
-        <div className="bg-white p-4 rounded-3xl shadow-sm border-2 border-blue-200 hover:shadow-md transition">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-1.5">
-              <span className="w-2.5 h-2.5 rounded-full bg-blue-600"></span>
-              <span className="text-[11px] uppercase font-extrabold tracking-wider text-blue-900">
-                Faith Cell
+            <div className="mt-2 flex items-baseline space-x-1.5">
+              <span className="text-3xl font-extrabold text-white">
+                {stats?.totalPresent || attendanceRecords.length}
+              </span>
+              <span className="text-xs text-slate-400 font-semibold">
+                / {stats?.totalMembers || members.length}
               </span>
             </div>
-            <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-blue-50 text-blue-700 border border-blue-200">
-              {faithStat.percentage}%
-            </span>
+
+            <div className="mt-2.5 w-full bg-slate-700/60 rounded-full h-2 overflow-hidden">
+              <div
+                className="bg-gradient-to-r from-blue-500 to-emerald-400 h-2 rounded-full transition-all duration-500"
+                style={{ width: `${Math.min(100, stats?.overallPercentage || 0)}%` }}
+              ></div>
+            </div>
           </div>
 
-          <div className="mt-2 flex items-baseline space-x-1.5">
-            <span className="text-3xl font-extrabold text-blue-700">{faithStat.present}</span>
-            <span className="text-xs text-slate-500 font-semibold">/ {faithStat.total}</span>
-          </div>
-
-          <div className="mt-2.5 w-full bg-blue-100 rounded-full h-2 overflow-hidden">
-            <div
-              className="bg-blue-600 h-2.5 rounded-full transition-all duration-500"
-              style={{ width: `${Math.min(100, faithStat.percentage)}%` }}
-            ></div>
-          </div>
-        </div>
-
-        {/* Hope Cell Card */}
-        <div className="bg-white p-4 rounded-3xl shadow-sm border-2 border-emerald-200 hover:shadow-md transition">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-1.5">
-              <span className="w-2.5 h-2.5 rounded-full bg-emerald-600"></span>
-              <span className="text-[11px] uppercase font-extrabold tracking-wider text-emerald-900">
-                Hope Cell
+          {/* Joy Cell Card */}
+          <div className="bg-white p-4 rounded-3xl shadow-sm border-2 border-amber-200 hover:shadow-md transition">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-1.5">
+                <span className="w-2.5 h-2.5 rounded-full bg-amber-500"></span>
+                <span className="text-[11px] uppercase font-extrabold tracking-wider text-amber-900">
+                  Joy Cell
+                </span>
+              </div>
+              <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-amber-50 text-amber-800 border border-amber-200">
+                {joyStat.percentage}%
               </span>
             </div>
-            <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-50 text-emerald-800 border border-emerald-200">
-              {hopeStat.percentage}%
-            </span>
+
+            <div className="mt-2 flex items-baseline space-x-1.5">
+              <span className="text-3xl font-extrabold text-amber-700">{joyStat.present}</span>
+              <span className="text-xs text-slate-500 font-semibold">/ {joyStat.total}</span>
+            </div>
+
+            <div className="mt-2.5 w-full bg-amber-100 rounded-full h-2 overflow-hidden">
+              <div
+                className="bg-amber-500 h-2 rounded-full transition-all duration-500"
+                style={{ width: `${Math.min(100, joyStat.percentage)}%` }}
+              ></div>
+            </div>
           </div>
 
-          <div className="mt-2 flex items-baseline space-x-1.5">
-            <span className="text-3xl font-extrabold text-emerald-700">{hopeStat.present}</span>
-            <span className="text-xs text-slate-500 font-semibold">/ {hopeStat.total}</span>
-          </div>
-
-          <div className="mt-2.5 w-full bg-emerald-100 rounded-full h-2 overflow-hidden">
-            <div
-              className="bg-emerald-600 h-2 rounded-full transition-all duration-500"
-              style={{ width: `${Math.min(100, hopeStat.percentage)}%` }}
-            ></div>
-          </div>
-        </div>
-
-        {/* Love Cell Card */}
-        <div className="bg-white p-4 rounded-3xl shadow-sm border-2 border-rose-200 hover:shadow-md transition">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-1.5">
-              <span className="w-2.5 h-2.5 rounded-full bg-rose-600"></span>
-              <span className="text-[11px] uppercase font-extrabold tracking-wider text-rose-900">
-                Love Cell
+          {/* Faith Cell Card */}
+          <div className="bg-white p-4 rounded-3xl shadow-sm border-2 border-blue-200 hover:shadow-md transition">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-1.5">
+                <span className="w-2.5 h-2.5 rounded-full bg-blue-600"></span>
+                <span className="text-[11px] uppercase font-extrabold tracking-wider text-blue-900">
+                  Faith Cell
+                </span>
+              </div>
+              <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-blue-50 text-blue-700 border border-blue-200">
+                {faithStat.percentage}%
               </span>
             </div>
-            <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-rose-50 text-rose-800 border border-rose-200">
-              {loveStat.percentage}%
-            </span>
+
+            <div className="mt-2 flex items-baseline space-x-1.5">
+              <span className="text-3xl font-extrabold text-blue-700">{faithStat.present}</span>
+              <span className="text-xs text-slate-500 font-semibold">/ {faithStat.total}</span>
+            </div>
+
+            <div className="mt-2.5 w-full bg-blue-100 rounded-full h-2 overflow-hidden">
+              <div
+                className="bg-blue-600 h-2.5 rounded-full transition-all duration-500"
+                style={{ width: `${Math.min(100, faithStat.percentage)}%` }}
+              ></div>
+            </div>
           </div>
 
-          <div className="mt-2 flex items-baseline space-x-1.5">
-            <span className="text-3xl font-extrabold text-rose-700">{loveStat.present}</span>
-            <span className="text-xs text-slate-500 font-semibold">/ {loveStat.total}</span>
+          {/* Hope Cell Card */}
+          <div className="bg-white p-4 rounded-3xl shadow-sm border-2 border-emerald-200 hover:shadow-md transition">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-1.5">
+                <span className="w-2.5 h-2.5 rounded-full bg-emerald-600"></span>
+                <span className="text-[11px] uppercase font-extrabold tracking-wider text-emerald-900">
+                  Hope Cell
+                </span>
+              </div>
+              <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-50 text-emerald-800 border border-emerald-200">
+                {hopeStat.percentage}%
+              </span>
+            </div>
+
+            <div className="mt-2 flex items-baseline space-x-1.5">
+              <span className="text-3xl font-extrabold text-emerald-700">{hopeStat.present}</span>
+              <span className="text-xs text-slate-500 font-semibold">/ {hopeStat.total}</span>
+            </div>
+
+            <div className="mt-2.5 w-full bg-emerald-100 rounded-full h-2 overflow-hidden">
+              <div
+                className="bg-emerald-600 h-2 rounded-full transition-all duration-500"
+                style={{ width: `${Math.min(100, hopeStat.percentage)}%` }}
+              ></div>
+            </div>
           </div>
 
-          <div className="mt-2.5 w-full bg-rose-100 rounded-full h-2 overflow-hidden">
-            <div
-              className="bg-rose-600 h-2 rounded-full transition-all duration-500"
-              style={{ width: `${Math.min(100, loveStat.percentage)}%` }}
-            ></div>
+          {/* Love Cell Card */}
+          <div className="bg-white p-4 rounded-3xl shadow-sm border-2 border-rose-200 hover:shadow-md transition">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-1.5">
+                <span className="w-2.5 h-2.5 rounded-full bg-rose-600"></span>
+                <span className="text-[11px] uppercase font-extrabold tracking-wider text-rose-900">
+                  Love Cell
+                </span>
+              </div>
+              <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-rose-50 text-rose-800 border border-rose-200">
+                {loveStat.percentage}%
+              </span>
+            </div>
+
+            <div className="mt-2 flex items-baseline space-x-1.5">
+              <span className="text-3xl font-extrabold text-rose-700">{loveStat.present}</span>
+              <span className="text-xs text-slate-500 font-semibold">/ {loveStat.total}</span>
+            </div>
+
+            <div className="mt-2.5 w-full bg-rose-100 rounded-full h-2 overflow-hidden">
+              <div
+                className="bg-rose-600 h-2 rounded-full transition-all duration-500"
+                style={{ width: `${Math.min(100, loveStat.percentage)}%` }}
+              ></div>
+            </div>
           </div>
         </div>
-      </div>
+      )}
 
       {/* 2. Rapid Check-In Control Bar */}
       <div className="bg-white p-5 rounded-3xl shadow-sm border border-slate-200 space-y-4">
@@ -348,66 +471,68 @@ export const CheckInDesk: React.FC<CheckInDeskProps> = ({
         {/* Filter Pills */}
         <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
           {/* Cell Filter Tabs */}
-          <div className="flex flex-wrap items-center gap-1.5 bg-slate-100 p-1.5 rounded-2xl">
-            <button
-              onClick={() => setGroupFilter('ALL')}
-              className={`px-3 py-1.5 rounded-xl text-xs font-extrabold transition ${
-                groupFilter === 'ALL'
-                  ? 'bg-white text-slate-900 shadow-sm'
-                  : 'text-slate-600 hover:text-slate-900'
-              }`}
-            >
-              All Cells <span className="text-[10px] text-slate-400 font-mono ml-1">[0]</span>
-            </button>
-            <button
-              onClick={() => setGroupFilter('JOY')}
-              className={`px-3 py-1.5 rounded-xl text-xs font-extrabold flex items-center space-x-1.5 transition ${
-                groupFilter === 'JOY'
-                  ? 'bg-amber-500 text-slate-950 shadow-sm'
-                  : 'text-amber-800 hover:bg-amber-50'
-              }`}
-            >
-              <span className="w-2 h-2 rounded-full bg-amber-500"></span>
-              <span>Joy</span>
-              <span className="text-[10px] font-mono ml-1 text-slate-400">[1]</span>
-            </button>
-            <button
-              onClick={() => setGroupFilter('FAITH')}
-              className={`px-3 py-1.5 rounded-xl text-xs font-extrabold flex items-center space-x-1.5 transition ${
-                groupFilter === 'FAITH'
-                  ? 'bg-blue-600 text-white shadow-sm'
-                  : 'text-blue-700 hover:bg-blue-50'
-              }`}
-            >
-              <span className="w-2 h-2 rounded-full bg-blue-600"></span>
-              <span>Faith</span>
-              <span className="text-[10px] font-mono ml-1 text-slate-400">[2]</span>
-            </button>
-            <button
-              onClick={() => setGroupFilter('HOPE')}
-              className={`px-3 py-1.5 rounded-xl text-xs font-extrabold flex items-center space-x-1.5 transition ${
-                groupFilter === 'HOPE'
-                  ? 'bg-emerald-600 text-white shadow-sm'
-                  : 'text-emerald-700 hover:bg-emerald-50'
-              }`}
-            >
-              <span className="w-2 h-2 rounded-full bg-emerald-600"></span>
-              <span>Hope</span>
-              <span className="text-[10px] font-mono ml-1 text-slate-400">[3]</span>
-            </button>
-            <button
-              onClick={() => setGroupFilter('LOVE')}
-              className={`px-3 py-1.5 rounded-xl text-xs font-extrabold flex items-center space-x-1.5 transition ${
-                groupFilter === 'LOVE'
-                  ? 'bg-rose-600 text-white shadow-sm'
-                  : 'text-rose-700 hover:bg-rose-50'
-              }`}
-            >
-              <span className="w-2 h-2 rounded-full bg-rose-600"></span>
-              <span>Love</span>
-              <span className="text-[10px] font-mono ml-1 text-slate-400">[4]</span>
-            </button>
-          </div>
+          {!isCellLeader && (
+            <div className="flex flex-wrap items-center gap-1.5 bg-slate-100 p-1.5 rounded-2xl">
+              <button
+                onClick={() => setGroupFilter('ALL')}
+                className={`px-3 py-1.5 rounded-xl text-xs font-extrabold transition ${
+                  groupFilter === 'ALL'
+                    ? 'bg-white text-slate-900 shadow-sm'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                All Cells <span className="text-[10px] text-slate-400 font-mono ml-1">[0]</span>
+              </button>
+              <button
+                onClick={() => setGroupFilter('JOY')}
+                className={`px-3 py-1.5 rounded-xl text-xs font-extrabold flex items-center space-x-1.5 transition ${
+                  groupFilter === 'JOY'
+                    ? 'bg-amber-500 text-slate-950 shadow-sm'
+                    : 'text-amber-800 hover:bg-amber-50'
+                }`}
+              >
+                <span className="w-2 h-2 rounded-full bg-amber-500"></span>
+                <span>Joy</span>
+                <span className="text-[10px] font-mono ml-1 text-slate-400">[1]</span>
+              </button>
+              <button
+                onClick={() => setGroupFilter('FAITH')}
+                className={`px-3 py-1.5 rounded-xl text-xs font-extrabold flex items-center space-x-1.5 transition ${
+                  groupFilter === 'FAITH'
+                    ? 'bg-blue-600 text-white shadow-sm'
+                    : 'text-blue-700 hover:bg-blue-50'
+                }`}
+              >
+                <span className="w-2 h-2 rounded-full bg-blue-600"></span>
+                <span>Faith</span>
+                <span className="text-[10px] font-mono ml-1 text-slate-400">[2]</span>
+              </button>
+              <button
+                onClick={() => setGroupFilter('HOPE')}
+                className={`px-3 py-1.5 rounded-xl text-xs font-extrabold flex items-center space-x-1.5 transition ${
+                  groupFilter === 'HOPE'
+                    ? 'bg-emerald-600 text-white shadow-sm'
+                    : 'text-emerald-700 hover:bg-emerald-50'
+                }`}
+              >
+                <span className="w-2 h-2 rounded-full bg-emerald-600"></span>
+                <span>Hope</span>
+                <span className="text-[10px] font-mono ml-1 text-slate-400">[3]</span>
+              </button>
+              <button
+                onClick={() => setGroupFilter('LOVE')}
+                className={`px-3 py-1.5 rounded-xl text-xs font-extrabold flex items-center space-x-1.5 transition ${
+                  groupFilter === 'LOVE'
+                    ? 'bg-rose-600 text-white shadow-sm'
+                    : 'text-rose-700 hover:bg-rose-50'
+                }`}
+              >
+                <span className="w-2 h-2 rounded-full bg-rose-600"></span>
+                <span>Love</span>
+                <span className="text-[10px] font-mono ml-1 text-slate-400">[4]</span>
+              </button>
+            </div>
+          )}
 
           {/* Status Filter */}
           <div className="flex items-center space-x-1 bg-slate-100 p-1.5 rounded-2xl">

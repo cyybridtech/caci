@@ -29,8 +29,30 @@ import {
   FinancialSummary,
   MessageLog,
   AssimilationStage,
-  ChurchGroup
+  ChurchGroup,
+  UserRole
 } from './types/index.ts';
+
+const isRoleAuthorizedForTab = (tab: string, role?: UserRole): boolean => {
+  if (!role || role === 'ADMIN') return true;
+  if (role === 'CELL_LEADER') {
+    return ['checkin', 'members', 'attendance-history', 'pipeline'].includes(tab);
+  }
+  if (role === 'MEDIA_TEAM') {
+    return ['checkin', 'attendance-history', 'celebrations', 'messaging'].includes(tab);
+  }
+  if (role === 'FINANCE') {
+    return ['finances', 'campaigns'].includes(tab);
+  }
+  return false;
+};
+
+const getDefaultTabForRole = (role?: UserRole): 'checkin' | 'finances' | 'analytics' => {
+  if (role === 'FINANCE') return 'finances';
+  if (role === 'MEDIA_TEAM') return 'checkin';
+  if (role === 'CELL_LEADER') return 'checkin';
+  return 'checkin';
+};
 
 export const App: React.FC = () => {
   const { user, isAuthenticated, logout } = useAuth();
@@ -48,6 +70,13 @@ export const App: React.FC = () => {
     | 'messaging'
     | 'users'
   >(user?.role === 'FINANCE' ? 'finances' : user?.role === 'MEDIA_TEAM' ? 'analytics' : 'checkin');
+
+  // Ensure activeTab matches role permissions whenever user changes
+  useEffect(() => {
+    if (user && !isRoleAuthorizedForTab(activeTab, user.role)) {
+      setActiveTab(getDefaultTabForRole(user.role));
+    }
+  }, [user, activeTab]);
 
   // Core data states
   const [activeSession, setActiveSession] = useState<ServiceSession | null>(null);
@@ -83,6 +112,22 @@ export const App: React.FC = () => {
     }, 3500);
   };
 
+  const handleLogout = () => {
+    // Clear state completely on logout to prevent state pollution across users/roles
+    setMembers([]);
+    setAttendanceRecords([]);
+    setStats(null);
+    setContributions([]);
+    setFinancialSummary(null);
+    setDepartments([]);
+    setSessions([]);
+    setActiveSession(null);
+    setMessageLogs([]);
+    setTodayCelebrantsCount(0);
+    setActiveTab('checkin');
+    logout();
+  };
+
   useEffect(() => {
     const unsubscribe = offlineSync.subscribe((online, queueCount) => {
       setIsOnline(online);
@@ -95,10 +140,34 @@ export const App: React.FC = () => {
     if (!isAuthenticated) return;
     try {
       setIsLoading(true);
+      const role = user?.role;
+
+      if (role === 'FINANCE') {
+        // Finance only needs members, finances, summary, and sessions
+        const [fetchedMembers, fetchedFinances, finSummary, fetchedActive, fetchedSessions] = await Promise.all([
+          api.getMembers().catch(() => []),
+          api.getFinances().catch(() => []),
+          api.getFinancialSummary().catch(() => null),
+          api.getActiveSession().catch(() => null),
+          api.getSessions().catch(() => [])
+        ]);
+        setMembers(fetchedMembers);
+        setContributions(fetchedFinances);
+        setFinancialSummary(finSummary);
+        setActiveSession(fetchedActive);
+        setSessions(fetchedSessions);
+        setAttendanceRecords([]);
+        setStats(null);
+        setDepartments([]);
+        setMessageLogs([]);
+        return;
+      }
+
+      // Non-finance roles
       const [fetchedSessions, fetchedActive, fetchedMembers, fetchedDepts] = await Promise.all([
-        api.getSessions(),
-        api.getActiveSession(),
-        api.getMembers(),
+        api.getSessions().catch(() => []),
+        api.getActiveSession().catch(() => null),
+        api.getMembers().catch(() => []),
         api.getDepartments().catch(() => [])
       ]);
 
@@ -108,31 +177,48 @@ export const App: React.FC = () => {
       setDepartments(fetchedDepts);
 
       if (fetchedActive) {
-        const [attRecords, attStats, fetchedFinances, finSummary, msgs, celData] = await Promise.all([
-          api.getSessionAttendance(fetchedActive.id).catch(() => []),
-          api.getAttendanceStats(fetchedActive.id).catch(() => null),
-          api.getFinances().catch(() => []),
-          api.getFinancialSummary().catch(() => null),
-          api.getMessageLogs().catch(() => []),
-          api.getTodayCelebrants().catch(() => [])
-        ]);
+        if (role === 'CELL_LEADER') {
+          // Cell Leader only needs attendance records and stats
+          const [attRecords, attStats] = await Promise.all([
+            api.getSessionAttendance(fetchedActive.id).catch(() => []),
+            api.getAttendanceStats(fetchedActive.id).catch(() => null)
+          ]);
+          setAttendanceRecords(attRecords);
+          setStats(attStats);
+          setContributions([]);
+          setFinancialSummary(null);
+          setMessageLogs([]);
+          setTodayCelebrantsCount(0);
+        } else {
+          // Admin & Media Team
+          const [attRecords, attStats, fetchedFinances, finSummary, msgs, celData] = await Promise.all([
+            api.getSessionAttendance(fetchedActive.id).catch(() => []),
+            api.getAttendanceStats(fetchedActive.id).catch(() => null),
+            role === 'ADMIN' ? api.getFinances().catch(() => []) : Promise.resolve([]),
+            role === 'ADMIN' ? api.getFinancialSummary().catch(() => null) : Promise.resolve(null),
+            api.getMessageLogs().catch(() => []),
+            api.getTodayCelebrants().catch(() => [])
+          ]);
 
-        setAttendanceRecords(attRecords);
-        setStats(attStats);
-        setContributions(fetchedFinances);
-        setFinancialSummary(finSummary);
-        setMessageLogs(msgs);
-        setTodayCelebrantsCount(Array.isArray(celData) ? celData.length : 0);
+          setAttendanceRecords(attRecords);
+          setStats(attStats);
+          setContributions(fetchedFinances);
+          setFinancialSummary(finSummary);
+          setMessageLogs(msgs);
+          setTodayCelebrantsCount(Array.isArray(celData) ? celData.length : 0);
+        }
       } else {
-        const celData = await api.getTodayCelebrants().catch(() => []);
-        setTodayCelebrantsCount(Array.isArray(celData) ? celData.length : 0);
+        if (role === 'ADMIN' || role === 'MEDIA_TEAM') {
+          const celData = await api.getTodayCelebrants().catch(() => []);
+          setTodayCelebrantsCount(Array.isArray(celData) ? celData.length : 0);
+        }
       }
     } catch (err) {
       console.error('Failed loading church data:', err);
     } finally {
       setIsLoading(false);
     }
-  }, [isAuthenticated]);
+  }, [isAuthenticated, user?.role]);
 
   useEffect(() => {
     loadData();
@@ -451,7 +537,7 @@ export const App: React.FC = () => {
         isSyncing={isSyncing}
         todayCelebrantsCount={todayCelebrantsCount}
         currentUser={user}
-        onLogout={logout}
+        onLogout={handleLogout}
       />
 
       {/* Main Workspace Body */}
@@ -463,7 +549,7 @@ export const App: React.FC = () => {
           </div>
         ) : (
           <>
-            {activeTab === 'checkin' && (
+            {activeTab === 'checkin' && isRoleAuthorizedForTab('checkin', user?.role) && (
               <CheckInDesk
                 session={activeSession}
                 members={members}
@@ -477,7 +563,7 @@ export const App: React.FC = () => {
               />
             )}
 
-            {activeTab === 'members' && (
+            {activeTab === 'members' && isRoleAuthorizedForTab('members', user?.role) && (
               <MembersDirectory
                 members={members}
                 onAddMember={handleAddMember}
@@ -488,23 +574,23 @@ export const App: React.FC = () => {
               />
             )}
 
-            {activeTab === 'attendance-history' && (
+            {activeTab === 'attendance-history' && isRoleAuthorizedForTab('attendance-history', user?.role) && (
               <AttendanceAuditView
                 members={members}
                 onInspectMemberHistory={(m) => setInspectingHistoryMember(m)}
               />
             )}
 
-            {activeTab === 'analytics' && <ExecutiveDashboard />}
+            {activeTab === 'analytics' && isRoleAuthorizedForTab('analytics', user?.role) && <ExecutiveDashboard />}
 
-            {activeTab === 'pipeline' && (
+            {activeTab === 'pipeline' && isRoleAuthorizedForTab('pipeline', user?.role) && (
               <AssimilationPipeline
                 members={members}
                 onUpdateStage={handleUpdateAssimilationStage}
               />
             )}
 
-            {activeTab === 'departments' && (
+            {activeTab === 'departments' && isRoleAuthorizedForTab('departments', user?.role) && (
               <DepartmentsView
                 departments={departments}
                 members={members}
@@ -527,7 +613,7 @@ export const App: React.FC = () => {
               />
             )}
 
-            {activeTab === 'finances' && (
+            {activeTab === 'finances' && isRoleAuthorizedForTab('finances', user?.role) && (
               <FinancesView
                 contributions={contributions}
                 summary={financialSummary}
@@ -537,11 +623,11 @@ export const App: React.FC = () => {
               />
             )}
 
-            {activeTab === 'campaigns' && <CampaignsView members={members} />}
+            {activeTab === 'campaigns' && isRoleAuthorizedForTab('campaigns', user?.role) && <CampaignsView members={members} />}
 
-            {activeTab === 'celebrations' && <CelebrationsView />}
+            {activeTab === 'celebrations' && isRoleAuthorizedForTab('celebrations', user?.role) && <CelebrationsView />}
 
-            {activeTab === 'messaging' && (
+            {activeTab === 'messaging' && isRoleAuthorizedForTab('messaging', user?.role) && (
               <MessagingView
                 session={activeSession}
                 departments={departments}
@@ -554,7 +640,7 @@ export const App: React.FC = () => {
               />
             )}
 
-            {activeTab === 'users' && <UserManagement />}
+            {activeTab === 'users' && isRoleAuthorizedForTab('users', user?.role) && <UserManagement />}
           </>
         )}
       </main>

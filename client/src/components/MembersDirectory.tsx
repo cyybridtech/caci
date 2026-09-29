@@ -21,6 +21,7 @@ import {
   Sparkles
 } from 'lucide-react';
 import { Member, ChurchGroup, Gender, MemberStatus, MaritalStatus } from '../types/index.ts';
+import { useAuth } from '../context/AuthContext.tsx';
 
 interface MembersDirectoryProps {
   members: Member[];
@@ -39,8 +40,20 @@ export const MembersDirectory: React.FC<MembersDirectoryProps> = ({
   onInspectMemberHistory,
   onInspectMemberProfile
 }) => {
+  const { user } = useAuth();
+  const isCellLeader = user?.role === 'CELL_LEADER';
+  const assignedCell = isCellLeader ? user?.cell : null;
+
   const [searchTerm, setSearchTerm] = useState('');
-  const [groupFilter, setGroupFilter] = useState<'ALL' | 'JOY' | 'FAITH' | 'HOPE' | 'LOVE'>('ALL');
+  const [groupFilter, setGroupFilter] = useState<'ALL' | 'JOY' | 'FAITH' | 'HOPE' | 'LOVE'>(
+    assignedCell || 'ALL'
+  );
+
+  React.useEffect(() => {
+    if (assignedCell) {
+      setGroupFilter(assignedCell);
+    }
+  }, [assignedCell]);
 
   // Modal states
   const [showAddModal, setShowAddModal] = useState(false);
@@ -77,7 +90,7 @@ export const MembersDirectory: React.FC<MembersDirectoryProps> = ({
     setEmail('');
     setGender('MALE');
     setMaritalStatus('SINGLE');
-    setChurchGroup('JOY');
+    setChurchGroup(assignedCell || 'JOY');
     setRole('Member');
     setStatus('ACTIVE');
     setDateOfBirth('');
@@ -300,48 +313,55 @@ export const MembersDirectory: React.FC<MembersDirectoryProps> = ({
         </div>
 
         {/* Cell Filter */}
-        <div className="flex flex-wrap items-center gap-1.5 bg-slate-100 p-1.5 rounded-2xl">
-          <button
-            onClick={() => setGroupFilter('ALL')}
-            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition ${
-              groupFilter === 'ALL' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600 hover:text-slate-900'
-            }`}
-          >
-            All Members ({members.length})
-          </button>
-          <button
-            onClick={() => setGroupFilter('JOY')}
-            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition ${
-              groupFilter === 'JOY' ? 'bg-amber-500 text-slate-950 shadow-sm' : 'text-amber-800 hover:bg-amber-100/50'
-            }`}
-          >
-            Joy Cell ({members.filter((m) => m.churchGroup === 'JOY').length})
-          </button>
-          <button
-            onClick={() => setGroupFilter('FAITH')}
-            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition ${
-              groupFilter === 'FAITH' ? 'bg-blue-600 text-white shadow-sm' : 'text-blue-800 hover:bg-blue-100/50'
-            }`}
-          >
-            Faith Cell ({members.filter((m) => m.churchGroup === 'FAITH').length})
-          </button>
-          <button
-            onClick={() => setGroupFilter('HOPE')}
-            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition ${
-              groupFilter === 'HOPE' ? 'bg-emerald-600 text-white shadow-sm' : 'text-emerald-800 hover:bg-emerald-100/50'
-            }`}
-          >
-            Hope Cell ({members.filter((m) => m.churchGroup === 'HOPE').length})
-          </button>
-          <button
-            onClick={() => setGroupFilter('LOVE')}
-            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition ${
-              groupFilter === 'LOVE' ? 'bg-rose-600 text-white shadow-sm' : 'text-rose-800 hover:bg-rose-100/50'
-            }`}
-          >
-            Love Cell ({members.filter((m) => m.churchGroup === 'LOVE').length})
-          </button>
-        </div>
+        {!isCellLeader ? (
+          <div className="flex flex-wrap items-center gap-1.5 bg-slate-100 p-1.5 rounded-2xl">
+            <button
+              onClick={() => setGroupFilter('ALL')}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition ${
+                groupFilter === 'ALL' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              All Members ({members.length})
+            </button>
+            <button
+              onClick={() => setGroupFilter('JOY')}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition ${
+                groupFilter === 'JOY' ? 'bg-amber-500 text-slate-950 shadow-sm' : 'text-amber-800 hover:bg-amber-100/50'
+              }`}
+            >
+              Joy Cell ({members.filter((m) => m.churchGroup === 'JOY').length})
+            </button>
+            <button
+              onClick={() => setGroupFilter('FAITH')}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition ${
+                groupFilter === 'FAITH' ? 'bg-blue-600 text-white shadow-sm' : 'text-blue-800 hover:bg-blue-100/50'
+              }`}
+            >
+              Faith Cell ({members.filter((m) => m.churchGroup === 'FAITH').length})
+            </button>
+            <button
+              onClick={() => setGroupFilter('HOPE')}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition ${
+                groupFilter === 'HOPE' ? 'bg-emerald-600 text-white shadow-sm' : 'text-emerald-800 hover:bg-emerald-100/50'
+              }`}
+            >
+              Hope Cell ({members.filter((m) => m.churchGroup === 'HOPE').length})
+            </button>
+            <button
+              onClick={() => setGroupFilter('LOVE')}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition ${
+                groupFilter === 'LOVE' ? 'bg-rose-600 text-white shadow-sm' : 'text-rose-800 hover:bg-rose-100/50'
+              }`}
+            >
+              Love Cell ({members.filter((m) => m.churchGroup === 'LOVE').length})
+            </button>
+          </div>
+        ) : (
+          <div className="flex items-center space-x-2 bg-slate-100 px-3 py-1.5 rounded-2xl text-xs font-extrabold text-slate-700">
+            <span className="w-2.5 h-2.5 rounded-full bg-blue-600"></span>
+            <span>{assignedCell ? `${assignedCell} Cell (${members.length} members)` : 'Your Cell'}</span>
+          </div>
+        )}
       </div>
 
       {/* Members Table */}
@@ -801,13 +821,22 @@ export const MembersDirectory: React.FC<MembersDirectoryProps> = ({
                       <label className="block text-xs font-bold text-slate-700 mb-1">Assigned Cell *</label>
                       <select
                         value={churchGroup}
+                        disabled={isCellLeader}
                         onChange={(e) => setChurchGroup(e.target.value as ChurchGroup)}
-                        className="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs font-bold"
+                        className={`w-full px-3 py-2 border border-slate-300 rounded-xl text-xs font-bold ${
+                          isCellLeader ? 'bg-slate-100 cursor-not-allowed text-slate-600' : ''
+                        }`}
                       >
-                        <option value="JOY">Joy Cell</option>
-                        <option value="FAITH">Faith Cell</option>
-                        <option value="HOPE">Hope Cell</option>
-                        <option value="LOVE">Love Cell</option>
+                        {isCellLeader && assignedCell ? (
+                          <option value={assignedCell}>{assignedCell} Cell</option>
+                        ) : (
+                          <>
+                            <option value="JOY">Joy Cell</option>
+                            <option value="FAITH">Faith Cell</option>
+                            <option value="HOPE">Hope Cell</option>
+                            <option value="LOVE">Love Cell</option>
+                          </>
+                        )}
                       </select>
                     </div>
 
@@ -1062,13 +1091,22 @@ export const MembersDirectory: React.FC<MembersDirectoryProps> = ({
                   <label className="block text-xs font-bold text-slate-700 mb-1">Assigned Cell *</label>
                   <select
                     value={churchGroup}
+                    disabled={isCellLeader}
                     onChange={(e) => setChurchGroup(e.target.value as ChurchGroup)}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs font-bold focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                    className={`w-full px-3 py-2 border border-slate-300 rounded-xl text-xs font-bold focus:ring-2 focus:ring-blue-500 focus:outline-none ${
+                      isCellLeader ? 'bg-slate-100 cursor-not-allowed text-slate-600' : ''
+                    }`}
                   >
-                    <option value="JOY">Joy Cell</option>
-                    <option value="FAITH">Faith Cell</option>
-                    <option value="HOPE">Hope Cell</option>
-                    <option value="LOVE">Love Cell</option>
+                    {isCellLeader && assignedCell ? (
+                      <option value={assignedCell}>{assignedCell} Cell</option>
+                    ) : (
+                      <>
+                        <option value="JOY">Joy Cell</option>
+                        <option value="FAITH">Faith Cell</option>
+                        <option value="HOPE">Hope Cell</option>
+                        <option value="LOVE">Love Cell</option>
+                      </>
+                    )}
                   </select>
                 </div>
 
