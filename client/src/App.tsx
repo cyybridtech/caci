@@ -420,6 +420,28 @@ export const App: React.FC = () => {
     showToast(`Undone check-in for ${member?.firstName || 'member'}`);
   };
 
+  // Explicit Save Attendance Handler
+  const handleSaveAttendance = async () => {
+    if (!activeSession) return;
+    try {
+      if (!isOnline) {
+        showToast('Attendance recorded offline. Will sync when reconnected.');
+        return;
+      }
+      await offlineSync.syncQueuedData().catch(() => {});
+      const [recs, st] = await Promise.all([
+        api.getSessionAttendance(activeSession.id),
+        api.getAttendanceStats(activeSession.id)
+      ]);
+      setAttendanceRecords(recs);
+      setStats(st);
+      showToast(`Attendance for ${activeSession.serviceType} saved permanently!`);
+    } catch (err: any) {
+      console.error('Error saving attendance:', err);
+      showToast(`Saved locally. ${err.message || ''}`);
+    }
+  };
+
   // Manual Sync
   const handleManualSync = async () => {
     try {
@@ -561,6 +583,7 @@ export const App: React.FC = () => {
                 departments={departments}
                 onCheckIn={handleCheckIn}
                 onUndoCheckIn={handleUndoCheckIn}
+                onSaveAttendance={handleSaveAttendance}
                 onViewMemberHistory={(m) => setInspectingHistoryMember(m)}
                 onOpenAddMember={() => setIsAddMemberOpen(true)}
                 onOpenEditMember={(m) => setEditingMember(m)}
@@ -571,6 +594,7 @@ export const App: React.FC = () => {
             {activeTab === 'members' && isRoleAuthorizedForTab('members', user?.role) && (
               <MembersDirectory
                 members={members}
+                departments={departments}
                 onAddMember={handleAddMember}
                 onUpdateMember={handleUpdateMember}
                 onDeleteMember={handleDeleteMember}
@@ -582,6 +606,8 @@ export const App: React.FC = () => {
             {activeTab === 'attendance-history' && isRoleAuthorizedForTab('attendance-history', user?.role) && (
               <AttendanceAuditView
                 members={members}
+                sessions={sessions}
+                onInspectMemberProfile={(m) => setProfileMember(m)}
                 onInspectMemberHistory={(m) => setInspectingHistoryMember(m)}
               />
             )}
@@ -681,6 +707,7 @@ export const App: React.FC = () => {
       <MemberFormModal
         isOpen={isAddMemberOpen}
         mode="create"
+        departments={departments}
         onClose={() => setIsAddMemberOpen(false)}
         onSubmit={async (data) => {
           await handleAddMember(data);
@@ -693,6 +720,7 @@ export const App: React.FC = () => {
         isOpen={Boolean(editingMember)}
         mode="edit"
         initialMember={editingMember}
+        departments={departments}
         onClose={() => setEditingMember(null)}
         onSubmit={async (data) => {
           if (editingMember) {

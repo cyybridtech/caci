@@ -1,12 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { X, User, UserPlus, Edit2, Camera, Image, CheckCircle, AlertCircle, Loader2 } from 'lucide-react';
-import { Member, ChurchGroup, Gender, MemberStatus, MaritalStatus } from '../types/index.ts';
+import { X, User, UserPlus, Edit2, Camera, Image, CheckCircle, AlertCircle, Loader2, Building2 } from 'lucide-react';
+import { Member, ChurchGroup, Gender, MemberStatus, MaritalStatus, Department } from '../types/index.ts';
 import { useAuth } from '../context/AuthContext.tsx';
+import { api } from '../services/api.ts';
 
 interface MemberFormModalProps {
   isOpen: boolean;
   mode: 'create' | 'edit';
   initialMember?: Member | null;
+  departments?: Department[];
   onClose: () => void;
   onSubmit: (memberData: any) => Promise<void>;
 }
@@ -15,12 +17,16 @@ export const MemberFormModal: React.FC<MemberFormModalProps> = ({
   isOpen,
   mode,
   initialMember,
+  departments,
   onClose,
   onSubmit
 }) => {
   const { user } = useAuth();
   const isCellLeader = user?.role === 'CELL_LEADER';
   const assignedCell = isCellLeader ? user?.cell : null;
+
+  const [availableDepartments, setAvailableDepartments] = useState<Department[]>(departments || []);
+  const [selectedDepartmentIds, setSelectedDepartmentIds] = useState<string[]>([]);
 
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
@@ -47,6 +53,14 @@ export const MemberFormModal: React.FC<MemberFormModalProps> = ({
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   useEffect(() => {
+    if (departments && departments.length > 0) {
+      setAvailableDepartments(departments);
+    } else if (isOpen) {
+      api.getDepartments().then(setAvailableDepartments).catch(() => {});
+    }
+  }, [departments, isOpen]);
+
+  useEffect(() => {
     if (!isOpen) return;
 
     setErrorMessage(null);
@@ -71,6 +85,11 @@ export const MemberFormModal: React.FC<MemberFormModalProps> = ({
       setIsWaterBaptized(Boolean(initialMember.isWaterBaptized));
       setIsHolyGhostBaptized(Boolean(initialMember.isHolyGhostBaptized));
       setNotes(initialMember.notes || '');
+
+      const deptIds = (initialMember.departments || [])
+        .map((d: any) => d.departmentId || d.department?.id || d.id)
+        .filter(Boolean);
+      setSelectedDepartmentIds(deptIds);
     } else {
       setFirstName('');
       setLastName('');
@@ -92,6 +111,7 @@ export const MemberFormModal: React.FC<MemberFormModalProps> = ({
       setIsWaterBaptized(true);
       setIsHolyGhostBaptized(true);
       setNotes('');
+      setSelectedDepartmentIds([]);
     }
   }, [isOpen, mode, initialMember, assignedCell]);
 
@@ -143,7 +163,8 @@ export const MemberFormModal: React.FC<MemberFormModalProps> = ({
         emergencyContactPhone: emergencyContactPhone.trim() || null,
         isWaterBaptized,
         isHolyGhostBaptized,
-        notes: notes.trim() || null
+        notes: notes.trim() || null,
+        departmentIds: selectedDepartmentIds
       };
 
       await onSubmit(payload);
@@ -368,6 +389,50 @@ export const MemberFormModal: React.FC<MemberFormModalProps> = ({
             </div>
           </div>
 
+          {/* Auxiliaries / Departments Selection */}
+          <div>
+            <div className="flex items-center justify-between mb-1.5">
+              <label className="block text-xs font-bold text-slate-700 uppercase flex items-center space-x-1.5">
+                <Building2 className="w-3.5 h-3.5 text-purple-600" />
+                <span>Auxiliaries & Church Departments</span>
+              </label>
+              <span className="text-[11px] text-slate-400 font-semibold">
+                {selectedDepartmentIds.length} auxiliary{selectedDepartmentIds.length !== 1 ? 'ies' : ''} assigned
+              </span>
+            </div>
+
+            {availableDepartments.length > 0 ? (
+              <div className="flex flex-wrap gap-2 p-3 bg-purple-50/40 border border-purple-200/60 rounded-2xl">
+                {availableDepartments.map((dept) => {
+                  const isSelected = selectedDepartmentIds.includes(dept.id);
+                  return (
+                    <button
+                      type="button"
+                      key={dept.id}
+                      onClick={() => {
+                        setSelectedDepartmentIds((prev) =>
+                          isSelected ? prev.filter((id) => id !== dept.id) : [...prev, dept.id]
+                        );
+                      }}
+                      className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center space-x-1.5 cursor-pointer ${
+                        isSelected
+                          ? 'bg-purple-600 text-white shadow-sm shadow-purple-600/30'
+                          : 'bg-white border border-slate-200 text-slate-700 hover:border-purple-300 hover:bg-white'
+                      }`}
+                    >
+                      <CheckCircle className={`w-3.5 h-3.5 ${isSelected ? 'text-white' : 'text-slate-300'}`} />
+                      <span>{dept.name}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="p-3 bg-slate-50 border border-slate-200 rounded-2xl text-xs text-slate-400 italic">
+                No auxiliaries available. You can add auxiliaries under the Auxiliaries tab.
+              </div>
+            )}
+          </div>
+
           {/* Dates & Demographics */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             <div>
@@ -503,7 +568,7 @@ export const MemberFormModal: React.FC<MemberFormModalProps> = ({
               type="button"
               disabled={isSubmitting}
               onClick={onClose}
-              className="px-4 py-2 text-xs font-bold text-slate-600 hover:text-slate-800 transition"
+              className="px-4 py-2 text-xs font-bold text-slate-600 hover:text-slate-800 transition cursor-pointer"
             >
               Cancel
             </button>

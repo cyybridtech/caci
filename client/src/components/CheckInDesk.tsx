@@ -14,7 +14,9 @@ import {
   Filter,
   History,
   UserPlus,
-  Edit2
+  Edit2,
+  Save,
+  ShieldCheck
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { Member, ServiceSession, AttendanceRecord, AttendanceStats, Department, ChurchGroup } from '../types/index.ts';
@@ -32,6 +34,7 @@ interface CheckInDeskProps {
   onViewMemberHistory: (member: Member) => void;
   onOpenAddMember?: () => void;
   onOpenEditMember?: (member: Member) => void;
+  onSaveAttendance?: () => Promise<void> | void;
   isLoading: boolean;
 }
 
@@ -46,6 +49,7 @@ export const CheckInDesk: React.FC<CheckInDeskProps> = ({
   onViewMemberHistory,
   onOpenAddMember,
   onOpenEditMember,
+  onSaveAttendance,
   isLoading
 }) => {
   const { user } = useAuth();
@@ -60,6 +64,10 @@ export const CheckInDesk: React.FC<CheckInDeskProps> = ({
   const [selectedDeptId, setSelectedDeptId] = useState<string>('ALL');
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [selectedIndex, setSelectedIndex] = useState(0);
+
+  const [isSavingAttendance, setIsSavingAttendance] = useState(false);
+  const [attendanceSavedAt, setAttendanceSavedAt] = useState<string | null>(null);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
 
   const searchInputRef = useRef<HTMLInputElement>(null);
 
@@ -145,6 +153,7 @@ export const CheckInDesk: React.FC<CheckInDeskProps> = ({
   };
 
   const handleMemberAction = async (memberId: string) => {
+    setHasUnsavedChanges(true);
     const isAlreadyPresent = checkedInIds.has(memberId);
     if (!isAlreadyPresent) {
       if (soundEnabled) playCheckInChime();
@@ -155,6 +164,28 @@ export const CheckInDesk: React.FC<CheckInDeskProps> = ({
       }
     } else {
       await onUndoCheckIn(memberId);
+    }
+  };
+
+  const handleSaveAttendance = async () => {
+    try {
+      setIsSavingAttendance(true);
+      if (onSaveAttendance) {
+        await onSaveAttendance();
+      }
+      if (soundEnabled) playCheckInChime();
+      confetti({
+        particleCount: 100,
+        spread: 70,
+        origin: { y: 0.6 }
+      });
+      const nowStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      setAttendanceSavedAt(nowStr);
+      setHasUnsavedChanges(false);
+    } catch (err: any) {
+      alert(err.message || 'Failed to save attendance');
+    } finally {
+      setIsSavingAttendance(false);
     }
   };
 
@@ -484,6 +515,33 @@ export const CheckInDesk: React.FC<CheckInDeskProps> = ({
               <span>Add Member</span>
             </button>
           )}
+
+          {/* Save Attendance Button */}
+          <button
+            onClick={handleSaveAttendance}
+            disabled={isSavingAttendance}
+            title="Permanently commit and save service attendance to the database"
+            className={`flex items-center justify-center space-x-2 px-5 py-3.5 rounded-2xl font-extrabold text-xs shadow-md transition shrink-0 cursor-pointer ${
+              hasUnsavedChanges
+                ? 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-emerald-600/30 ring-2 ring-emerald-400/50'
+                : attendanceSavedAt
+                ? 'bg-slate-900 hover:bg-slate-800 text-emerald-400 border border-emerald-500/30 shadow-sm'
+                : 'bg-slate-900 hover:bg-slate-800 text-white shadow-slate-900/20'
+            }`}
+          >
+            {attendanceSavedAt && !hasUnsavedChanges ? (
+              <ShieldCheck className="w-4 h-4 text-emerald-400" />
+            ) : (
+              <Save className="w-4 h-4" />
+            )}
+            <span>
+              {isSavingAttendance
+                ? 'Saving...'
+                : attendanceSavedAt && !hasUnsavedChanges
+                ? `Saved (${attendanceSavedAt})`
+                : `Save Attendance (${attendanceRecords.length})`}
+            </span>
+          </button>
         </div>
 
         {/* Filter Pills */}
@@ -796,6 +854,40 @@ export const CheckInDesk: React.FC<CheckInDeskProps> = ({
           </div>
         </div>
       </div>
+      {/* Floating Save Attendance Banner */}
+      {attendanceRecords.length > 0 && (
+        <div className="fixed bottom-5 left-1/2 -translate-x-1/2 z-30 bg-slate-900/95 backdrop-blur-md text-white px-5 py-3 rounded-2xl shadow-2xl border border-slate-700/80 flex items-center justify-between gap-4 max-w-xl w-[92%] sm:w-auto animate-in fade-in slide-in-from-bottom-3">
+          <div className="flex items-center space-x-3 min-w-0">
+            <div
+              className={`w-2.5 h-2.5 rounded-full shrink-0 ${
+                hasUnsavedChanges ? 'bg-amber-400 animate-ping' : 'bg-emerald-400'
+              }`}
+            ></div>
+            <div className="truncate text-left">
+              <span className="font-extrabold text-xs block text-white truncate">
+                {session?.serviceType || 'Service Attendance'}
+              </span>
+              <span className="text-[11px] text-slate-400 font-medium block">
+                {attendanceRecords.length} congregant{attendanceRecords.length !== 1 ? 's' : ''} marked
+                {attendanceSavedAt ? ` • Saved permanently at ${attendanceSavedAt}` : ' • Click Save to make permanent'}
+              </span>
+            </div>
+          </div>
+
+          <button
+            onClick={handleSaveAttendance}
+            disabled={isSavingAttendance}
+            className={`flex items-center space-x-1.5 px-4 py-2 text-white font-extrabold text-xs rounded-xl shadow-md transition cursor-pointer shrink-0 ${
+              hasUnsavedChanges
+                ? 'bg-emerald-600 hover:bg-emerald-500 shadow-emerald-600/30 ring-2 ring-emerald-400/40'
+                : 'bg-blue-600 hover:bg-blue-500 shadow-blue-600/30'
+            }`}
+          >
+            <Save className="w-3.5 h-3.5" />
+            <span>{isSavingAttendance ? 'Saving...' : 'Save Permanently'}</span>
+          </button>
+        </div>
+      )}
     </div>
   );
 };

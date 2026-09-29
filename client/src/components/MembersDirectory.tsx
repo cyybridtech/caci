@@ -9,13 +9,14 @@ import {
   Edit2,
   Trash2
 } from 'lucide-react';
-import { Member, ChurchGroup } from '../types/index.ts';
+import { Member, ChurchGroup, Department } from '../types/index.ts';
 import { useAuth } from '../context/AuthContext.tsx';
 import { MemberFormModal } from './MemberFormModal.tsx';
 import { MemberProfileModal } from './MemberProfileModal.tsx';
 
 interface MembersDirectoryProps {
   members: Member[];
+  departments?: Department[];
   onAddMember: (memberData: any) => Promise<void>;
   onUpdateMember: (id: string, memberData: any) => Promise<void>;
   onDeleteMember: (id: string) => Promise<void>;
@@ -25,6 +26,7 @@ interface MembersDirectoryProps {
 
 export const MembersDirectory: React.FC<MembersDirectoryProps> = ({
   members,
+  departments,
   onAddMember,
   onUpdateMember,
   onDeleteMember,
@@ -33,7 +35,7 @@ export const MembersDirectory: React.FC<MembersDirectoryProps> = ({
   const { user } = useAuth();
   const isCellLeader = user?.role === 'CELL_LEADER';
   const assignedCell = isCellLeader ? user?.cell : null;
-  const canDelete = user?.role === 'ADMIN' || user?.role === 'CELL_LEADER';
+  const canDelete = user?.role === 'ADMIN' || user?.role === 'CELL_LEADER' || user?.role === 'MEDIA_TEAM';
 
   const [searchTerm, setSearchTerm] = useState('');
   const [groupFilter, setGroupFilter] = useState<'ALL' | 'JOY' | 'FAITH' | 'HOPE' | 'LOVE'>(
@@ -414,6 +416,7 @@ export const MembersDirectory: React.FC<MembersDirectoryProps> = ({
         isOpen={formModalState.isOpen}
         mode={formModalState.mode}
         initialMember={formModalState.member}
+        departments={departments}
         onClose={() => setFormModalState({ isOpen: false, mode: 'create', member: null })}
         onSubmit={handleFormSubmit}
       />

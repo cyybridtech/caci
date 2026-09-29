@@ -615,7 +615,7 @@ export const MemberProfileModal: React.FC<MemberProfileModalProps> = ({
         {/* Footer Actions */}
         <div className="p-4 bg-slate-950 border-t border-slate-800 flex items-center justify-between space-x-3 shrink-0">
           <div>
-            {onDelete && (user?.role === 'ADMIN' || user?.role === 'CELL_LEADER') && (
+            {onDelete && (user?.role === 'ADMIN' || user?.role === 'CELL_LEADER' || user?.role === 'MEDIA_TEAM') && (
               <button
                 onClick={() => {
                   if (
