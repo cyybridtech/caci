@@ -16,7 +16,9 @@ import {
   AuthUser,
   SystemUser,
   UserRole,
-  ChurchGroup
+  ChurchGroup,
+  ChurchExpense,
+  ExpenseSummary
 } from '../types/index.ts';
 
 const BASE_URL = (import.meta.env.VITE_API_URL as string) || '/api';
@@ -370,6 +372,84 @@ export const api = {
       headers: getAuthHeaders()
     });
     if (!res.ok) throw new Error('Failed to fetch member giving statement');
+    return res.json();
+  },
+
+  async updateContribution(id: string, data: any): Promise<FinancialContribution> {
+    const res = await fetch(`${BASE_URL}/finances/${id}`, {
+      method: 'PUT',
+      headers: getAuthHeaders(),
+      body: JSON.stringify(data)
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: 'Failed to update contribution' }));
+      throw new Error(err.error || 'Failed to update contribution');
+    }
+    return res.json();
+  },
+
+  async deleteContribution(id: string): Promise<{ success: boolean }> {
+    const res = await fetch(`${BASE_URL}/finances/${id}`, {
+      method: 'DELETE',
+      headers: getAuthHeaders()
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: 'Failed to delete contribution' }));
+      throw new Error(err.error || 'Failed to delete contribution');
+    }
+    return res.json();
+  },
+
+  // Expenses
+  async getExpenses(params?: { category?: string }): Promise<ChurchExpense[]> {
+    const query = new URLSearchParams();
+    if (params?.category && params.category !== 'ALL') query.append('category', params.category);
+    const res = await fetch(`${BASE_URL}/expenses?${query.toString()}`, { headers: getAuthHeaders() });
+    if (!res.ok) throw new Error('Failed to fetch expenses');
+    return res.json();
+  },
+
+  async getExpenseSummary(): Promise<ExpenseSummary> {
+    const res = await fetch(`${BASE_URL}/expenses/summary`, { headers: getAuthHeaders() });
+    if (!res.ok) throw new Error('Failed to fetch expense summary');
+    return res.json();
+  },
+
+  async createExpense(data: any): Promise<ChurchExpense> {
+    const res = await fetch(`${BASE_URL}/expenses`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify(data)
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: 'Failed to create expense' }));
+      throw new Error(err.error || 'Failed to create expense');
+    }
+    return res.json();
+  },
+
+  async updateExpense(id: string, data: any): Promise<ChurchExpense> {
+    const res = await fetch(`${BASE_URL}/expenses/${id}`, {
+      method: 'PUT',
+      headers: getAuthHeaders(),
+      body: JSON.stringify(data)
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: 'Failed to update expense' }));
+      throw new Error(err.error || 'Failed to update expense');
+    }
+    return res.json();
+  },
+
+  async deleteExpense(id: string): Promise<{ success: boolean }> {
+    const res = await fetch(`${BASE_URL}/expenses/${id}`, {
+      method: 'DELETE',
+      headers: getAuthHeaders()
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: 'Failed to delete expense' }));
+      throw new Error(err.error || 'Failed to delete expense');
+    }
     return res.json();
   },
 

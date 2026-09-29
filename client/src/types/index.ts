@@ -349,3 +349,34 @@ export interface PledgeCampaign {
   partialCount: number;
   pledges?: MemberPledge[];
 }
+
+export type ExpenseCategory =
+  | 'UTILITY'
+  | 'MAINTENANCE'
+  | 'MINISTRY'
+  | 'STAFF'
+  | 'PROGRAM'
+  | 'EQUIPMENT'
+  | 'TRANSPORT'
+  | 'OTHER';
+
+export interface ChurchExpense {
+  id: string;
+  title: string;
+  category: ExpenseCategory;
+  amount: number | string;
+  paymentMethod: PaymentMethod;
+  expenseDate: string;
+  vendorName: string | null;
+  authorizedBy: string | null;
+  receiptNumber: string | null;
+  description: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ExpenseSummary {
+  total: number;
+  byCategory: Record<string, number>;
+  count: number;
+}

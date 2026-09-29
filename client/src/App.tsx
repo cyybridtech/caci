@@ -541,6 +541,32 @@ export const App: React.FC = () => {
     }
   };
 
+  // Update Contribution
+  const handleUpdateContribution = async (id: string, data: any) => {
+    try {
+      const updated = await api.updateContribution(id, data);
+      setContributions((prev) => prev.map((c) => (c.id === id ? updated : c)));
+      const summary = await api.getFinancialSummary();
+      setFinancialSummary(summary);
+      showToast(`Contribution updated successfully!`);
+    } catch (err: any) {
+      alert(err.message || 'Failed to update contribution');
+    }
+  };
+
+  // Delete Contribution
+  const handleDeleteContribution = async (id: string) => {
+    try {
+      await api.deleteContribution(id);
+      setContributions((prev) => prev.filter((c) => c.id !== id));
+      const summary = await api.getFinancialSummary();
+      setFinancialSummary(summary);
+      showToast('Contribution deleted.');
+    } catch (err: any) {
+      alert(err.message || 'Failed to delete contribution');
+    }
+  };
+
   // Broadcast messaging
   const handleBroadcast = async (data: any) => {
     const res = await api.broadcastMessage(data);
@@ -672,6 +698,8 @@ export const App: React.FC = () => {
                 members={members}
                 session={activeSession}
                 onRecordContribution={handleRecordContribution}
+                onUpdateContribution={handleUpdateContribution}
+                onDeleteContribution={handleDeleteContribution}
               />
             )}
 

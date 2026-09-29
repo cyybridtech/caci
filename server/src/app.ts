@@ -13,6 +13,7 @@ import { celebrationRouter } from './routes/celebrationRoutes.js';
 import { campaignRouter } from './routes/campaignRoutes.js';
 import { authRouter } from './routes/authRoutes.js';
 import { userRouter } from './routes/userRoutes.js';
+import { expenseRouter } from './routes/expenseRoutes.js';
 import { prisma } from './db.js';
 
 dotenv.config();
@@ -75,5 +76,6 @@ app.use('/api/messages', messageRouter);
 app.use('/api/sync', syncRouter);
 app.use('/api/celebrations', celebrationRouter);
 app.use('/api/campaigns', campaignRouter);
+app.use('/api/expenses', expenseRouter);
 
 export default app;

@@ -223,3 +223,57 @@ financeRouter.get('/member/:memberId', async (req: Request, res: Response) => {
     res.status(500).json({ error: 'Failed to fetch member giving statement' });
   }
 });
+
+// PUT /api/finances/:id - edit a contribution (Admin & Finance)
+financeRouter.put('/:id', requireRole(UserRole.ADMIN, UserRole.FINANCE), async (req: Request, res: Response) => {
+  try {
+    const id = req.params.id as string;
+    const { memberId, sessionId, category, amount, paymentMethod, transactionDate, notes } = req.body;
+
+    const existing = await prisma.financialContribution.findUnique({ where: { id } });
+    if (!existing) return res.status(404).json({ error: 'Contribution not found' });
+
+    if (amount !== undefined && (isNaN(Number(amount)) || Number(amount) <= 0)) {
+      return res.status(400).json({ error: 'Valid amount is required' });
+    }
+
+    const updated = await prisma.financialContribution.update({
+      where: { id },
+      data: {
+        memberId: memberId !== undefined ? (memberId || null) : existing.memberId,
+        sessionId: sessionId !== undefined ? (sessionId || null) : existing.sessionId,
+        category: (category as FinancialCategory) ?? existing.category,
+        amount: amount !== undefined ? Number(amount) : existing.amount,
+        paymentMethod: (paymentMethod as PaymentMethod) ?? existing.paymentMethod,
+        transactionDate: transactionDate ? new Date(transactionDate) : existing.transactionDate,
+        notes: notes !== undefined ? (notes?.trim() || null) : existing.notes
+      },
+      include: {
+        member: {
+          select: { id: true, photoUrl: true, firstName: true, lastName: true, phone: true, churchGroup: true }
+        },
+        session: { select: { id: true, serviceDate: true, serviceType: true } }
+      }
+    });
+
+    res.json(updated);
+  } catch (error: any) {
+    console.error('Error updating contribution:', error);
+    res.status(500).json({ error: 'Failed to update contribution' });
+  }
+});
+
+// DELETE /api/finances/:id - delete a contribution (Admin & Finance)
+financeRouter.delete('/:id', requireRole(UserRole.ADMIN, UserRole.FINANCE), async (req: Request, res: Response) => {
+  try {
+    const id = req.params.id as string;
+    const existing = await prisma.financialContribution.findUnique({ where: { id } });
+    if (!existing) return res.status(404).json({ error: 'Contribution not found' });
+
+    await prisma.financialContribution.delete({ where: { id } });
+    res.json({ success: true, message: 'Contribution deleted successfully' });
+  } catch (error: any) {
+    console.error('Error deleting contribution:', error);
+    res.status(500).json({ error: 'Failed to delete contribution' });
+  }
+});
