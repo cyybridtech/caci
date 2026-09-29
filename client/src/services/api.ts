@@ -180,7 +180,10 @@ export const api = {
       headers: getAuthHeaders(),
       body: JSON.stringify(data)
     });
-    if (!res.ok) throw new Error('Failed to update member');
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: 'Failed to update member' }));
+      throw new Error(err.message || err.error || 'Failed to update member');
+    }
     return res.json();
   },
 
@@ -189,7 +192,10 @@ export const api = {
       method: 'DELETE',
       headers: getAuthHeaders()
     });
-    if (!res.ok) throw new Error('Failed to delete member');
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: 'Failed to delete member' }));
+      throw new Error(err.message || err.error || 'Failed to delete member');
+    }
     return res.json();
   },
 

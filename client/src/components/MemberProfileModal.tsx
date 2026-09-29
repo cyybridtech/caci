@@ -17,7 +17,9 @@ import {
   Sparkles,
   Award,
   AlertCircle,
-  FileText
+  FileText,
+  Edit2,
+  Trash2
 } from 'lucide-react';
 import { Member, ChurchGroup, FinancialContribution, MemberPledge } from '../types/index.ts';
 import { api } from '../services/api.ts';
@@ -27,12 +29,14 @@ interface MemberProfileModalProps {
   member: Member;
   onClose: () => void;
   onEdit?: (member: Member) => void;
+  onDelete?: (id: string) => Promise<void> | void;
 }
 
 export const MemberProfileModal: React.FC<MemberProfileModalProps> = ({
   member: initialMember,
   onClose,
-  onEdit
+  onEdit,
+  onDelete
 }) => {
   const { user } = useAuth();
   const isCellLeader = user?.role === 'CELL_LEADER';
@@ -609,24 +613,48 @@ export const MemberProfileModal: React.FC<MemberProfileModalProps> = ({
         </div>
 
         {/* Footer Actions */}
-        <div className="p-4 bg-slate-950 border-t border-slate-800 flex justify-end space-x-3 shrink-0">
-          <button
-            onClick={onClose}
-            className="px-5 py-2.5 rounded-2xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold"
-          >
-            Close
-          </button>
-          {onEdit && (
+        <div className="p-4 bg-slate-950 border-t border-slate-800 flex items-center justify-between space-x-3 shrink-0">
+          <div>
+            {onDelete && (user?.role === 'ADMIN' || user?.role === 'CELL_LEADER') && (
+              <button
+                onClick={() => {
+                  if (
+                    confirm(
+                      `Are you sure you want to delete ${fullMember.firstName} ${fullMember.lastName}? This will permanently remove their records.`
+                    )
+                  ) {
+                    onDelete(fullMember.id);
+                    onClose();
+                  }
+                }}
+                className="px-4 py-2.5 rounded-2xl bg-rose-950/70 hover:bg-rose-900 border border-rose-800/60 text-rose-300 text-xs font-bold transition flex items-center space-x-1.5"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>Delete Member</span>
+              </button>
+            )}
+          </div>
+
+          <div className="flex items-center space-x-3">
             <button
-              onClick={() => {
-                onClose();
-                onEdit(fullMember);
-              }}
-              className="px-5 py-2.5 rounded-2xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold shadow-lg shadow-blue-900/30"
+              onClick={onClose}
+              className="px-5 py-2.5 rounded-2xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold transition"
             >
-              Edit Member
+              Close
             </button>
-          )}
+            {onEdit && (
+              <button
+                onClick={() => {
+                  onClose();
+                  onEdit(fullMember);
+                }}
+                className="px-5 py-2.5 rounded-2xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold shadow-lg shadow-blue-900/30 transition flex items-center space-x-1.5"
+              >
+                <Edit2 className="w-3.5 h-3.5" />
+                <span>Edit Member</span>
+              </button>
+            )}
+          </div>
         </div>
       </div>
     </div>

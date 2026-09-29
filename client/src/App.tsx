@@ -14,6 +14,7 @@ import { UserManagement } from './components/UserManagement.tsx';
 import { LoginPage } from './components/LoginPage.tsx';
 import { ChangePasswordModal } from './components/ChangePasswordModal.tsx';
 import { MemberProfileModal } from './components/MemberProfileModal.tsx';
+import { MemberFormModal } from './components/MemberFormModal.tsx';
 import { Footer } from './components/Footer.tsx';
 import { MemberAttendanceHistoryModal } from './components/MemberAttendanceHistoryModal.tsx';
 import { useAuth } from './context/AuthContext.tsx';
@@ -39,7 +40,7 @@ const isRoleAuthorizedForTab = (tab: string, role?: UserRole): boolean => {
     return ['checkin', 'members', 'attendance-history', 'pipeline'].includes(tab);
   }
   if (role === 'MEDIA_TEAM') {
-    return ['checkin', 'attendance-history', 'celebrations', 'messaging'].includes(tab);
+    return ['checkin', 'members', 'attendance-history', 'celebrations', 'messaging'].includes(tab);
   }
   if (role === 'FINANCE') {
     return ['finances', 'campaigns'].includes(tab);
@@ -93,6 +94,8 @@ export const App: React.FC = () => {
   // Modals
   const [inspectingHistoryMember, setInspectingHistoryMember] = useState<Member | null>(null);
   const [profileMember, setProfileMember] = useState<Member | null>(null);
+  const [editingMember, setEditingMember] = useState<Member | null>(null);
+  const [isAddMemberOpen, setIsAddMemberOpen] = useState(false);
 
   // UI & Sync states
   const [isLoading, setIsLoading] = useState(true);
@@ -559,6 +562,8 @@ export const App: React.FC = () => {
                 onCheckIn={handleCheckIn}
                 onUndoCheckIn={handleUndoCheckIn}
                 onViewMemberHistory={(m) => setInspectingHistoryMember(m)}
+                onOpenAddMember={() => setIsAddMemberOpen(true)}
+                onOpenEditMember={(m) => setEditingMember(m)}
                 isLoading={isLoading}
               />
             )}
@@ -663,10 +668,39 @@ export const App: React.FC = () => {
           onClose={() => setProfileMember(null)}
           onEdit={(m) => {
             setProfileMember(null);
-            // Open in edit mode
+            setEditingMember(m);
+          }}
+          onDelete={async (id) => {
+            await handleDeleteMember(id);
+            setProfileMember(null);
           }}
         />
       )}
+
+      {/* Global Add Member Modal */}
+      <MemberFormModal
+        isOpen={isAddMemberOpen}
+        mode="create"
+        onClose={() => setIsAddMemberOpen(false)}
+        onSubmit={async (data) => {
+          await handleAddMember(data);
+          setIsAddMemberOpen(false);
+        }}
+      />
+
+      {/* Global Edit Member Modal */}
+      <MemberFormModal
+        isOpen={Boolean(editingMember)}
+        mode="edit"
+        initialMember={editingMember}
+        onClose={() => setEditingMember(null)}
+        onSubmit={async (data) => {
+          if (editingMember) {
+            await handleUpdateMember(editingMember.id, data);
+            setEditingMember(null);
+          }
+        }}
+      />
     </div>
   );
 };

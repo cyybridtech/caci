@@ -12,7 +12,9 @@ import {
   Check,
   ChevronRight,
   Filter,
-  History
+  History,
+  UserPlus,
+  Edit2
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { Member, ServiceSession, AttendanceRecord, AttendanceStats, Department, ChurchGroup } from '../types/index.ts';
@@ -28,6 +30,8 @@ interface CheckInDeskProps {
   onCheckIn: (memberId: string) => Promise<void>;
   onUndoCheckIn: (memberId: string) => Promise<void>;
   onViewMemberHistory: (member: Member) => void;
+  onOpenAddMember?: () => void;
+  onOpenEditMember?: (member: Member) => void;
   isLoading: boolean;
 }
 
@@ -40,6 +44,8 @@ export const CheckInDesk: React.FC<CheckInDeskProps> = ({
   onCheckIn,
   onUndoCheckIn,
   onViewMemberHistory,
+  onOpenAddMember,
+  onOpenEditMember,
   isLoading
 }) => {
   const { user } = useAuth();
@@ -429,43 +435,55 @@ export const CheckInDesk: React.FC<CheckInDeskProps> = ({
 
       {/* 2. Rapid Check-In Control Bar */}
       <div className="bg-white p-5 rounded-3xl shadow-sm border border-slate-200 space-y-4">
-        <div className="relative flex items-center">
-          <Search className="w-5 h-5 text-slate-400 absolute left-4" />
-          <input
-            ref={searchInputRef}
-            type="text"
-            placeholder="Type name, phone, or ID (e.g. Kwame, CACI-001)... [Press Enter to check in, '/' to search]"
-            value={searchTerm}
-            onChange={(e) => {
-              setSearchTerm(e.target.value);
-              setSelectedIndex(0);
-            }}
-            onKeyDown={handleSearchKeyDown}
-            className="w-full pl-11 pr-28 py-3.5 bg-slate-50 hover:bg-slate-100/60 focus:bg-white border-2 border-slate-200 focus:border-blue-600 rounded-2xl text-slate-900 text-base font-semibold placeholder-slate-400 focus:outline-none focus:ring-4 focus:ring-blue-100 transition shadow-inner"
-          />
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+          <div className="relative flex-1 flex items-center">
+            <Search className="w-5 h-5 text-slate-400 absolute left-4" />
+            <input
+              ref={searchInputRef}
+              type="text"
+              placeholder="Type name, phone, or ID (e.g. Kwame, CACI-001)... [Press Enter to check in, '/' to search]"
+              value={searchTerm}
+              onChange={(e) => {
+                setSearchTerm(e.target.value);
+                setSelectedIndex(0);
+              }}
+              onKeyDown={handleSearchKeyDown}
+              className="w-full pl-11 pr-28 py-3.5 bg-slate-50 hover:bg-slate-100/60 focus:bg-white border-2 border-slate-200 focus:border-blue-600 rounded-2xl text-slate-900 text-base font-semibold placeholder-slate-400 focus:outline-none focus:ring-4 focus:ring-blue-100 transition shadow-inner"
+            />
 
-          <div className="absolute right-3 flex items-center space-x-2">
-            {searchTerm && (
+            <div className="absolute right-3 flex items-center space-x-2">
+              {searchTerm && (
+                <button
+                  onClick={() => setSearchTerm('')}
+                  className="text-xs text-slate-400 hover:text-slate-600 font-bold px-2 py-1 rounded"
+                >
+                  Clear
+                </button>
+              )}
+
               <button
-                onClick={() => setSearchTerm('')}
-                className="text-xs text-slate-400 hover:text-slate-600 font-bold px-2 py-1 rounded"
+                onClick={() => setSoundEnabled(!soundEnabled)}
+                title={soundEnabled ? 'Chime sound enabled' : 'Chime sound muted'}
+                className={`p-1.5 rounded-xl border transition ${
+                  soundEnabled
+                    ? 'bg-blue-50 border-blue-200 text-blue-700'
+                    : 'bg-slate-100 border-slate-200 text-slate-400'
+                }`}
               >
-                Clear
+                {soundEnabled ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
               </button>
-            )}
-
-            <button
-              onClick={() => setSoundEnabled(!soundEnabled)}
-              title={soundEnabled ? 'Chime sound enabled' : 'Chime sound muted'}
-              className={`p-1.5 rounded-xl border transition ${
-                soundEnabled
-                  ? 'bg-blue-50 border-blue-200 text-blue-700'
-                  : 'bg-slate-100 border-slate-200 text-slate-400'
-              }`}
-            >
-              {soundEnabled ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
-            </button>
+            </div>
           </div>
+
+          {onOpenAddMember && (
+            <button
+              onClick={onOpenAddMember}
+              className="flex items-center justify-center space-x-1.5 px-4 py-3.5 rounded-2xl bg-blue-600 hover:bg-blue-500 text-white font-extrabold text-xs shadow-md shadow-blue-600/30 transition shrink-0 cursor-pointer"
+            >
+              <UserPlus className="w-4 h-4" />
+              <span>Add Member</span>
+            </button>
+          )}
         </div>
 
         {/* Filter Pills */}
@@ -687,14 +705,27 @@ export const CheckInDesk: React.FC<CheckInDeskProps> = ({
                     </div>
 
                     {/* Right: Check-In Action Button */}
-                    <div className="flex items-center space-x-2 shrink-0">
+                    <div className="flex items-center space-x-1 shrink-0">
+                      {onOpenEditMember && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onOpenEditMember(member);
+                          }}
+                          title="Edit Member Details"
+                          className="p-2 rounded-xl text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition cursor-pointer"
+                        >
+                          <Edit2 className="w-4 h-4" />
+                        </button>
+                      )}
+
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
                           onViewMemberHistory(member);
                         }}
                         title="View Attendance History"
-                        className="p-2 rounded-xl text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition"
+                        className="p-2 rounded-xl text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition cursor-pointer"
                       >
                         <History className="w-4 h-4" />
                       </button>

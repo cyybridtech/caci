@@ -111,7 +111,7 @@ export const Header: React.FC<HeaderProps> = ({
     }
 
     if (currentUser.role === 'MEDIA_TEAM') {
-      return ['checkin', 'attendance-history', 'celebrations', 'messaging'].includes(tab);
+      return ['checkin', 'members', 'attendance-history', 'celebrations', 'messaging'].includes(tab);
     }
 
     if (currentUser.role === 'FINANCE') {

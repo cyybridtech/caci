@@ -241,8 +241,8 @@ memberRouter.post('/', async (req: Request, res: Response) => {
   try {
     const currentUser = req.user!;
 
-    if (currentUser.role === UserRole.MEDIA_TEAM || currentUser.role === UserRole.FINANCE) {
-      return res.status(403).json({ error: 'Media team and Finance are not authorized to create members' });
+    if (currentUser.role === UserRole.FINANCE) {
+      return res.status(403).json({ error: 'Finance role is not authorized to create members' });
     }
 
     const {
@@ -344,7 +344,7 @@ memberRouter.put('/:id', async (req: Request, res: Response) => {
     const id = req.params.id as string;
     const currentUser = req.user!;
 
-    if (currentUser.role === UserRole.MEDIA_TEAM || currentUser.role === UserRole.FINANCE) {
+    if (currentUser.role === UserRole.FINANCE) {
       return res.status(403).json({ error: 'Not authorized to update members' });
     }
 
@@ -383,7 +383,7 @@ memberRouter.put('/:id', async (req: Request, res: Response) => {
     } = req.body;
 
     let targetCell = undefined;
-    if (currentUser.role === UserRole.ADMIN && churchGroup && ['JOY', 'FAITH', 'HOPE', 'LOVE'].includes(churchGroup)) {
+    if ((currentUser.role === UserRole.ADMIN || currentUser.role === UserRole.MEDIA_TEAM) && churchGroup && ['JOY', 'FAITH', 'HOPE', 'LOVE'].includes(churchGroup)) {
       targetCell = churchGroup as ChurchGroup;
     }
 
@@ -498,7 +498,7 @@ memberRouter.delete('/:id', async (req: Request, res: Response) => {
     const id = req.params.id as string;
     const currentUser = req.user!;
 
-    if (currentUser.role === UserRole.MEDIA_TEAM || currentUser.role === UserRole.FINANCE) {
+    if (currentUser.role === UserRole.FINANCE) {
       return res.status(403).json({ error: 'Unauthorized to delete members' });
     }
 
@@ -511,7 +511,16 @@ memberRouter.delete('/:id', async (req: Request, res: Response) => {
       return res.status(403).json({ error: 'You can only delete members in your assigned cell' });
     }
 
-    await prisma.member.delete({ where: { id } });
+    // Safely delete all dependent records in transaction to prevent TiDB foreign key constraint failures
+    await prisma.$transaction([
+      prisma.memberDepartment.deleteMany({ where: { memberId: id } }),
+      prisma.attendanceRecord.deleteMany({ where: { memberId: id } }),
+      prisma.celebrationLog.deleteMany({ where: { memberId: id } }),
+      prisma.financialContribution.deleteMany({ where: { memberId: id } }),
+      prisma.memberPledge.deleteMany({ where: { memberId: id } }),
+      prisma.member.delete({ where: { id } })
+    ]);
+
     res.json({ success: true, message: 'Member deleted successfully' });
   } catch (error: any) {
     console.error('Error deleting member:', error);
