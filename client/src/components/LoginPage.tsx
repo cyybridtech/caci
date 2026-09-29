@@ -45,7 +45,7 @@ export const LoginPage: React.FC = () => {
           </p>
           <div className="flex items-center justify-center space-x-2 mt-2">
             <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30">
-              Church Management System
+              FWC - Family Worship Center (Asenua)
             </span>
             <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-blue-900/60 text-blue-300 border border-blue-500/30">
               Cyybrid Technology

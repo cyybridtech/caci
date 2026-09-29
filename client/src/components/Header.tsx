@@ -134,7 +134,7 @@ export const Header: React.FC<HeaderProps> = ({
             <div className="flex items-center space-x-2">
               <span className="font-extrabold text-lg tracking-tight text-white">CACI</span>
               <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40">
-                Church Desk
+                FWC
               </span>
               {currentUser?.cell && (
                 <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-900/60 text-blue-300 border border-blue-500/30">
@@ -142,7 +142,7 @@ export const Header: React.FC<HeaderProps> = ({
                 </span>
               )}
             </div>
-            <p className="text-[11px] text-slate-400">Christ Apostolic Church Int. Management System</p>
+            <p className="text-[11px] text-slate-400">Family Worship Center (Asenua)</p>
           </div>
         </div>
 

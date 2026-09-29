@@ -305,6 +305,26 @@ export const App: React.FC = () => {
     }
   };
 
+  // Delete session handler
+  const handleDeleteSession = (sessionId: string) => {
+    setSessions((prev) => {
+      const remaining = prev.filter((s) => s.id !== sessionId);
+      if (activeSession?.id === sessionId) {
+        const nextActive = remaining[0] || null;
+        setActiveSession(nextActive);
+        if (nextActive) {
+          api.getSessionAttendance(nextActive.id).then(setAttendanceRecords).catch(() => setAttendanceRecords([]));
+          api.getAttendanceStats(nextActive.id).then(setStats).catch(() => setStats(null));
+        } else {
+          setAttendanceRecords([]);
+          setStats(null);
+        }
+      }
+      return remaining;
+    });
+    showToast('Service session removed');
+  };
+
   // Check-In handler
   const handleCheckIn = async (memberId: string) => {
     if (!activeSession) return;
@@ -609,6 +629,7 @@ export const App: React.FC = () => {
                 sessions={sessions}
                 onInspectMemberProfile={(m) => setProfileMember(m)}
                 onInspectMemberHistory={(m) => setInspectingHistoryMember(m)}
+                onDeleteSession={handleDeleteSession}
               />
             )}
 

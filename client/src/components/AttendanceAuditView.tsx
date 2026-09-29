@@ -15,7 +15,8 @@ import {
   History,
   Sparkles,
   Layers,
-  ChevronLeft
+  ChevronLeft,
+  Trash2
 } from 'lucide-react';
 import { Member, ChurchGroup, ServiceSession, AttendanceRecord } from '../types/index.ts';
 import { useAuth } from '../context/AuthContext.tsx';
@@ -26,13 +27,15 @@ interface AttendanceAuditViewProps {
   sessions?: ServiceSession[];
   onInspectMemberHistory?: (member: Member) => void;
   onInspectMemberProfile?: (member: Member) => void;
+  onDeleteSession?: (sessionId: string) => void;
 }
 
 export const AttendanceAuditView: React.FC<AttendanceAuditViewProps> = ({
   members,
   sessions: initialSessions,
   onInspectMemberHistory,
-  onInspectMemberProfile
+  onInspectMemberProfile,
+  onDeleteSession
 }) => {
   const { user } = useAuth();
   const isCellLeader = user?.role === 'CELL_LEADER';
@@ -98,6 +101,62 @@ export const AttendanceAuditView: React.FC<AttendanceAuditViewProps> = ({
         setIsLoadingAttendees(false);
       });
   }, [selectedSession, assignedCell]);
+
+  // Delete Service Session Handler
+  const handleDeleteSession = async (session: ServiceSession) => {
+    const formattedDate = new Date(session.serviceDate).toLocaleDateString(undefined, {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric'
+    });
+    const confirmMessage = `Are you sure you want to delete this service session:\n\n"${session.serviceType}" (${formattedDate})?\n\nThis will permanently remove all attendance and financial records recorded for this service.`;
+    if (!window.confirm(confirmMessage)) return;
+
+    try {
+      await api.deleteSession(session.id);
+      setSessions((prev) => prev.filter((s) => s.id !== session.id));
+      if (selectedSession?.id === session.id) {
+        setSelectedSession(null);
+      }
+      if (onDeleteSession) {
+        onDeleteSession(session.id);
+      }
+    } catch (err: any) {
+      console.error('Failed to delete session:', err);
+      alert(err.message || 'Failed to delete service session');
+    }
+  };
+
+  // Delete / Undo Single Attendance Record in Service Roster
+  const handleDeleteAttendanceRecord = async (record: AttendanceRecord) => {
+    const memberName = record.member ? `${record.member.firstName} ${record.member.lastName}` : 'this congregant';
+    if (!window.confirm(`Are you sure you want to remove ${memberName} from this service attendance?`)) {
+      return;
+    }
+
+    try {
+      await api.undoCheckIn(record.sessionId, record.memberId);
+      setSessionAttendees((prev) => prev.filter((r) => r.id !== record.id));
+      // Decrement attendance count for this session
+      setSessions((prev) =>
+        prev.map((s) => {
+          if (s.id === record.sessionId && s._count) {
+            return {
+              ...s,
+              _count: {
+                ...s._count,
+                attendance: Math.max(0, (s._count.attendance || 1) - 1)
+              }
+            };
+          }
+          return s;
+        })
+      );
+    } catch (err: any) {
+      console.error('Failed to remove attendance record:', err);
+      alert(err.message || 'Failed to remove attendance record');
+    }
+  };
 
   const getCellLabel = (cell: ChurchGroup) => {
     switch (cell) {
@@ -330,9 +389,24 @@ export const AttendanceAuditView: React.FC<AttendanceAuditViewProps> = ({
                               <span>{formattedDate}</span>
                             </span>
 
-                            <span className="text-[10px] font-mono font-bold text-slate-400 uppercase tracking-wider">
-                              Session ID: {session.id.slice(0, 8)}
-                            </span>
+                            <div className="flex items-center space-x-1.5">
+                              <span className="text-[10px] font-mono font-bold text-slate-400 uppercase tracking-wider">
+                                {session.id.slice(0, 8)}
+                              </span>
+                              {(user?.role === 'ADMIN' || user?.role === 'MEDIA_TEAM') && (
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleDeleteSession(session);
+                                  }}
+                                  className="p-1 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition cursor-pointer"
+                                  title="Delete this service session"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              )}
+                            </div>
                           </div>
 
                           {/* Service Type Title */}
@@ -394,13 +468,26 @@ export const AttendanceAuditView: React.FC<AttendanceAuditViewProps> = ({
                     <span>Back to All Services Grid</span>
                   </button>
 
-                  <button
-                    onClick={handleExportSessionCSV}
-                    className="flex items-center space-x-1.5 px-3.5 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold shadow-md shadow-blue-600/30 transition cursor-pointer"
-                  >
-                    <Download className="w-3.5 h-3.5" />
-                    <span>Export Attendance CSV</span>
-                  </button>
+                  <div className="flex items-center space-x-2">
+                    <button
+                      onClick={handleExportSessionCSV}
+                      className="flex items-center space-x-1.5 px-3.5 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold shadow-md shadow-blue-600/30 transition cursor-pointer"
+                    >
+                      <Download className="w-3.5 h-3.5" />
+                      <span>Export Attendance CSV</span>
+                    </button>
+
+                    {(user?.role === 'ADMIN' || user?.role === 'MEDIA_TEAM') && (
+                      <button
+                        onClick={() => handleDeleteSession(selectedSession)}
+                        className="flex items-center space-x-1.5 px-3.5 py-2 rounded-xl bg-rose-600/80 hover:bg-rose-600 text-white text-xs font-bold transition cursor-pointer border border-rose-500/40 shadow-sm"
+                        title="Delete this service session"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                        <span>Delete Service</span>
+                      </button>
+                    )}
+                  </div>
                 </div>
 
                 <div>
@@ -563,6 +650,9 @@ export const AttendanceAuditView: React.FC<AttendanceAuditViewProps> = ({
                             <th className="px-4 py-3.5">Marked By</th>
                             <th className="px-4 py-3.5">Phone Number</th>
                             <th className="px-4 py-3.5 text-right">Profile</th>
+                            {(user?.role === 'ADMIN' || user?.role === 'MEDIA_TEAM' || user?.role === 'CELL_LEADER') && (
+                              <th className="px-4 py-3.5 text-center">Remove</th>
+                            )}
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
@@ -661,6 +751,23 @@ export const AttendanceAuditView: React.FC<AttendanceAuditViewProps> = ({
                                 <td className="px-4 py-3.5 text-right">
                                   <span className="text-blue-600 font-bold hover:underline">View Bio →</span>
                                 </td>
+
+                                {/* Remove from Attendance */}
+                                {(user?.role === 'ADMIN' || user?.role === 'MEDIA_TEAM' || user?.role === 'CELL_LEADER') && (
+                                  <td className="px-4 py-3.5 text-center">
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleDeleteAttendanceRecord(record);
+                                      }}
+                                      className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition cursor-pointer"
+                                      title={`Remove ${m.firstName} ${m.lastName} from this attendance`}
+                                    >
+                                      <Trash2 className="w-3.5 h-3.5" />
+                                    </button>
+                                  </td>
+                                )}
                               </tr>
                             );
                           })}

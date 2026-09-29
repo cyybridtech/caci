@@ -1,5 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { prisma } from '../db.js';
+import { UserRole } from '@prisma/client';
 import { requireAuth, requireRole } from '../middleware/auth.js';
 
 export const sessionRouter = Router();
@@ -141,5 +142,28 @@ sessionRouter.post('/', async (req: Request, res: Response) => {
   } catch (error: any) {
     console.error('Error creating service session:', error);
     res.status(500).json({ error: 'Failed to create service session' });
+  }
+});
+
+// DELETE /api/sessions/:id - delete a service session and its cascade records
+sessionRouter.delete('/:id', requireRole(UserRole.ADMIN, UserRole.MEDIA_TEAM), async (req: Request, res: Response) => {
+  try {
+    const id = req.params.id as string;
+
+    const session = await prisma.serviceSession.findUnique({ where: { id } });
+    if (!session) {
+      return res.status(404).json({ error: 'Service session not found' });
+    }
+
+    await prisma.$transaction([
+      prisma.attendanceRecord.deleteMany({ where: { sessionId: id } }),
+      prisma.financialContribution.deleteMany({ where: { sessionId: id } }),
+      prisma.serviceSession.delete({ where: { id } })
+    ]);
+
+    res.json({ success: true, message: 'Service session deleted successfully' });
+  } catch (error: any) {
+    console.error('Error deleting service session:', error);
+    res.status(500).json({ error: 'Failed to delete service session' });
   }
 });

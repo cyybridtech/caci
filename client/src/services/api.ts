@@ -276,6 +276,18 @@ export const api = {
     return res.json();
   },
 
+  async deleteSession(sessionId: string): Promise<{ success: boolean; message: string }> {
+    const res = await fetch(`${BASE_URL}/sessions/${sessionId}`, {
+      method: 'DELETE',
+      headers: getAuthHeaders()
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: 'Failed to delete session' }));
+      throw new Error(err.error || 'Failed to delete service session');
+    }
+    return res.json();
+  },
+
   // Attendance & Analytics
   async getSessionAttendance(sessionId: string): Promise<AttendanceRecord[]> {
     const res = await fetch(`${BASE_URL}/attendance/session/${sessionId}`, {
