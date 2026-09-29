@@ -1,23 +1,31 @@
 import React, { useState } from 'react';
-import { Building2, Users, Plus, Shield, MessageSquare, Phone, X, Check } from 'lucide-react';
-import { Department } from '../types/index.ts';
+import { Building2, Plus, Shield, MessageSquare, X, UserPlus, Trash2 } from 'lucide-react';
+import { Department, Member } from '../types/index.ts';
 
 interface DepartmentsViewProps {
   departments: Department[];
+  members: Member[];
   onCreateDepartment: (data: { name: string; description?: string; leaderName?: string }) => Promise<void>;
   onNavigateToMessaging: (targetType: string, departmentId?: string) => void;
+  onAddMember: (deptId: string, memberId: string) => Promise<void>;
+  onRemoveMember: (deptId: string, memberId: string) => Promise<void>;
 }
 
 export const DepartmentsView: React.FC<DepartmentsViewProps> = ({
   departments,
+  members,
   onCreateDepartment,
-  onNavigateToMessaging
+  onNavigateToMessaging,
+  onAddMember,
+  onRemoveMember,
 }) => {
   const [selectedDept, setSelectedDept] = useState<Department | null>(null);
   const [showAddModal, setShowAddModal] = useState(false);
   const [deptName, setDeptName] = useState('');
   const [deptLeader, setDeptLeader] = useState('');
   const [deptDesc, setDeptDesc] = useState('');
+  const [addMemberId, setAddMemberId] = useState('');
+  const [isAddingMember, setIsAddingMember] = useState(false);
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -26,7 +34,7 @@ export const DepartmentsView: React.FC<DepartmentsViewProps> = ({
     await onCreateDepartment({
       name: deptName.trim(),
       leaderName: deptLeader.trim() || undefined,
-      description: deptDesc.trim() || undefined
+      description: deptDesc.trim() || undefined,
     });
 
     setDeptName('');
@@ -34,6 +42,33 @@ export const DepartmentsView: React.FC<DepartmentsViewProps> = ({
     setDeptDesc('');
     setShowAddModal(false);
   };
+
+  const handleAddMember = async () => {
+    if (!selectedDept || !addMemberId) return;
+    setIsAddingMember(true);
+    try {
+      await onAddMember(selectedDept.id, addMemberId);
+      // Refresh the selected dept from the updated departments array
+      setAddMemberId('');
+    } finally {
+      setIsAddingMember(false);
+    }
+  };
+
+  const handleRemoveMember = async (memberId: string) => {
+    if (!selectedDept) return;
+    await onRemoveMember(selectedDept.id, memberId);
+  };
+
+  // Keep selectedDept in sync when departments prop updates
+  const liveDept = selectedDept
+    ? departments.find((d) => d.id === selectedDept.id) ?? selectedDept
+    : null;
+
+  // Members not yet in the selected dept
+  const availableMembers = liveDept
+    ? members.filter((m) => !(liveDept.members || []).some((dm) => dm.member.id === m.id))
+    : members;
 
   return (
     <div className="space-y-6">
@@ -44,7 +79,7 @@ export const DepartmentsView: React.FC<DepartmentsViewProps> = ({
             <Building2 className="w-6 h-6" />
           </div>
           <div>
-            <h2 className="text-lg font-bold text-slate-900">Church Auxiliaries & Departments</h2>
+            <h2 className="text-lg font-bold text-slate-900">Church Auxiliaries &amp; Departments</h2>
             <p className="text-xs text-slate-500">
               Manage ministries, department rosters, leaders, and auxiliary communication
             </p>
@@ -96,7 +131,7 @@ export const DepartmentsView: React.FC<DepartmentsViewProps> = ({
                 onClick={() => setSelectedDept(dept)}
                 className="text-xs font-bold text-blue-600 hover:text-blue-800 transition"
               >
-                View Roster & Members →
+                View Roster &amp; Members →
               </button>
 
               <button
@@ -112,15 +147,15 @@ export const DepartmentsView: React.FC<DepartmentsViewProps> = ({
       </div>
 
       {/* Department Roster Modal */}
-      {selectedDept && (
+      {liveDept && (
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl w-full max-w-2xl shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
             <div className="bg-slate-900 text-white px-6 py-4 flex items-center justify-between">
               <div>
-                <h3 className="font-bold text-base">{selectedDept.name}</h3>
+                <h3 className="font-bold text-base">{liveDept.name}</h3>
                 <p className="text-xs text-slate-400">
-                  {selectedDept.leaderName ? `Leader: ${selectedDept.leaderName} • ` : ''}
-                  {selectedDept.members?.length || 0} member(s)
+                  {liveDept.leaderName ? `Leader: ${liveDept.leaderName} • ` : ''}
+                  {liveDept.members?.length || 0} member(s)
                 </p>
               </div>
               <button
@@ -132,13 +167,39 @@ export const DepartmentsView: React.FC<DepartmentsViewProps> = ({
             </div>
 
             <div className="p-6 space-y-4 max-h-[70vh] overflow-y-auto">
-              {(!selectedDept.members || selectedDept.members.length === 0) ? (
+              {/* Add Member Row */}
+              <div className="flex items-center gap-2 p-3 bg-purple-50 rounded-xl border border-purple-100">
+                <select
+                  value={addMemberId}
+                  onChange={(e) => setAddMemberId(e.target.value)}
+                  className="flex-1 px-3 py-2 border border-slate-300 rounded-lg text-xs font-medium text-slate-900 focus:ring-2 focus:ring-purple-500 focus:outline-none"
+                >
+                  <option value="">— Select member to add —</option>
+                  {availableMembers.map((m) => (
+                    <option key={m.id} value={m.id}>
+                      {m.firstName} {m.lastName} ({m.churchGroup})
+                    </option>
+                  ))}
+                </select>
+                <button
+                  type="button"
+                  disabled={!addMemberId || isAddingMember}
+                  onClick={handleAddMember}
+                  className="flex items-center space-x-1.5 px-3 py-2 bg-purple-600 hover:bg-purple-500 disabled:opacity-50 text-white font-bold text-xs rounded-lg transition"
+                >
+                  <UserPlus className="w-3.5 h-3.5" />
+                  <span>{isAddingMember ? 'Adding…' : 'Add'}</span>
+                </button>
+              </div>
+
+              {/* Member List */}
+              {(!liveDept.members || liveDept.members.length === 0) ? (
                 <div className="text-center py-8 text-slate-400 text-xs">
                   No members are currently assigned to this department.
                 </div>
               ) : (
                 <div className="space-y-2">
-                  {selectedDept.members.map(({ member }) => (
+                  {liveDept.members.map(({ member }) => (
                     <div
                       key={member.id}
                       className="p-3 bg-slate-50 border border-slate-200 rounded-xl flex items-center justify-between text-xs"
@@ -182,9 +243,14 @@ export const DepartmentsView: React.FC<DepartmentsViewProps> = ({
                         >
                           {member.churchGroup}
                         </span>
-                        <span className="px-2 py-0.5 rounded bg-slate-200 text-slate-700 font-medium text-[10px]">
-                          {member.role}
-                        </span>
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveMember(member.id)}
+                          className="p-1 rounded-lg bg-rose-50 text-rose-600 hover:bg-rose-100 transition"
+                          title="Remove from department"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
                       </div>
                     </div>
                   ))}
@@ -194,7 +260,7 @@ export const DepartmentsView: React.FC<DepartmentsViewProps> = ({
               <div className="pt-3 border-t border-slate-100 flex items-center justify-between">
                 <button
                   onClick={() => {
-                    const deptId = selectedDept.id;
+                    const deptId = liveDept.id;
                     setSelectedDept(null);
                     onNavigateToMessaging('DEPARTMENT', deptId);
                   }}
@@ -238,7 +304,7 @@ export const DepartmentsView: React.FC<DepartmentsViewProps> = ({
                 <input
                   type="text"
                   required
-                  placeholder="e.g. Welfare & Benevolence Team"
+                  placeholder="e.g. Welfare &amp; Benevolence Team"
                   value={deptName}
                   onChange={(e) => setDeptName(e.target.value)}
                   className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-purple-500 focus:outline-none"

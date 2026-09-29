@@ -267,6 +267,97 @@ campaignRouter.post('/pledges/:pledgeId/payments', async (req: Request, res: Res
   }
 });
 
+// PUT /api/campaigns/pledges/:pledgeId - update pledge details
+campaignRouter.put('/pledges/:pledgeId', async (req: Request, res: Response) => {
+  try {
+    const pledgeId = req.params.pledgeId as string;
+    const { pledgedAmount, dueDate, notes, donorName, donorPhone, memberId } = req.body;
+
+    const existingPledge = await prisma.memberPledge.findUnique({
+      where: { id: pledgeId }
+    });
+
+    if (!existingPledge) {
+      return res.status(404).json({ error: 'Pledge not found' });
+    }
+
+    let resolvedDonorName = donorName !== undefined ? donorName : existingPledge.donorName;
+    let resolvedDonorPhone = donorPhone !== undefined ? donorPhone : existingPledge.donorPhone;
+
+    if (memberId) {
+      const member = await prisma.member.findUnique({ where: { id: memberId } });
+      if (member) {
+        resolvedDonorName = `${member.firstName} ${member.lastName}`;
+        resolvedDonorPhone = member.phone || undefined;
+      }
+    }
+
+    const newPledgedAmount = pledgedAmount !== undefined ? Number(pledgedAmount) : Number(existingPledge.pledgedAmount);
+    const amountPaid = Number(existingPledge.amountPaid);
+
+    let newStatus: PledgeStatus = existingPledge.status;
+    if (amountPaid >= newPledgedAmount && newPledgedAmount > 0) {
+      newStatus = PledgeStatus.FULFILLED;
+    } else if (amountPaid > 0) {
+      newStatus = PledgeStatus.PARTIALLY_PAID;
+    } else {
+      newStatus = PledgeStatus.PENDING;
+    }
+
+    const updatedPledge = await prisma.memberPledge.update({
+      where: { id: pledgeId },
+      data: {
+        memberId: memberId !== undefined ? (memberId || null) : undefined,
+        donorName: resolvedDonorName || 'Anonymous Donor',
+        donorPhone: resolvedDonorPhone || null,
+        pledgedAmount: newPledgedAmount,
+        dueDate: dueDate !== undefined ? (dueDate ? new Date(dueDate) : null) : undefined,
+        notes: notes !== undefined ? (notes ? notes.trim() : null) : undefined,
+        status: newStatus
+      },
+      include: {
+        member: true,
+        payments: true
+      }
+    });
+
+    res.json(updatedPledge);
+  } catch (error: any) {
+    console.error('Error updating pledge:', error);
+    res.status(500).json({ error: 'Failed to update pledge' });
+  }
+});
+
+// DELETE /api/campaigns/pledges/:pledgeId - delete pledge
+campaignRouter.delete('/pledges/:pledgeId', async (req: Request, res: Response) => {
+  try {
+    const pledgeId = req.params.pledgeId as string;
+
+    const existingPledge = await prisma.memberPledge.findUnique({
+      where: { id: pledgeId }
+    });
+
+    if (!existingPledge) {
+      return res.status(404).json({ error: 'Pledge not found' });
+    }
+
+    // Delete associated pledge payments first
+    await prisma.pledgePayment.deleteMany({
+      where: { pledgeId }
+    });
+
+    // Delete the pledge
+    await prisma.memberPledge.delete({
+      where: { id: pledgeId }
+    });
+
+    res.json({ success: true, message: 'Pledge deleted successfully' });
+  } catch (error: any) {
+    console.error('Error deleting pledge:', error);
+    res.status(500).json({ error: 'Failed to delete pledge' });
+  }
+});
+
 // POST /api/campaigns/:id/remind-sms - send gentle Vynfy SMS reminders to unpaid/partial pledgers
 campaignRouter.post('/:id/remind-sms', async (req: Request, res: Response) => {
   try {

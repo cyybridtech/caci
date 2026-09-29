@@ -212,6 +212,25 @@ export const api = {
     return res.json();
   },
 
+  async addMemberToDepartment(departmentId: string, memberId: string): Promise<Department> {
+    const res = await fetch(`${BASE_URL}/departments/${departmentId}/members`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ memberId })
+    });
+    if (!res.ok) throw new Error('Failed to add member to department');
+    return res.json();
+  },
+
+  async removeMemberFromDepartment(departmentId: string, memberId: string): Promise<{ success: boolean }> {
+    const res = await fetch(`${BASE_URL}/departments/${departmentId}/members/${memberId}`, {
+      method: 'DELETE',
+      headers: getAuthHeaders()
+    });
+    if (!res.ok) throw new Error('Failed to remove member from department');
+    return res.json();
+  },
+
   // Sessions & Date Selection
   async getActiveSession(): Promise<ServiceSession> {
     const res = await fetch(`${BASE_URL}/sessions/active`, {
@@ -463,6 +482,38 @@ export const api = {
       body: JSON.stringify(data)
     });
     if (!res.ok) throw new Error('Failed to record pledge');
+    return res.json();
+  },
+
+  async updatePledge(pledgeId: string, data: {
+    memberId?: string;
+    donorName?: string;
+    donorPhone?: string;
+    pledgedAmount?: number;
+    dueDate?: string;
+    notes?: string;
+  }): Promise<MemberPledge> {
+    const res = await fetch(`${BASE_URL}/campaigns/pledges/${pledgeId}`, {
+      method: 'PUT',
+      headers: getAuthHeaders(),
+      body: JSON.stringify(data)
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: 'Failed to update pledge' }));
+      throw new Error(err.message || err.error || 'Failed to update pledge');
+    }
+    return res.json();
+  },
+
+  async deletePledge(pledgeId: string): Promise<{ success: boolean; message?: string }> {
+    const res = await fetch(`${BASE_URL}/campaigns/pledges/${pledgeId}`, {
+      method: 'DELETE',
+      headers: getAuthHeaders()
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: 'Failed to delete pledge' }));
+      throw new Error(err.message || err.error || 'Failed to delete pledge');
+    }
     return res.json();
   },
 

@@ -81,3 +81,91 @@ departmentRouter.post('/', async (req: Request, res: Response) => {
     res.status(500).json({ error: 'Failed to create department' });
   }
 });
+
+// POST /api/departments/:id/members - Assign member to department
+departmentRouter.post('/:id/members', async (req: Request, res: Response) => {
+  try {
+    const departmentId = req.params.id as string;
+    const { memberId } = req.body;
+
+    if (!memberId) {
+      return res.status(400).json({ error: 'memberId is required' });
+    }
+
+    const dept = await prisma.department.findUnique({ where: { id: departmentId } });
+    if (!dept) {
+      return res.status(404).json({ error: 'Department not found' });
+    }
+
+    const member = await prisma.member.findUnique({ where: { id: memberId } });
+    if (!member) {
+      return res.status(404).json({ error: 'Member not found' });
+    }
+
+    // Upsert join record
+    await prisma.memberDepartment.upsert({
+      where: {
+        memberId_departmentId: {
+          memberId,
+          departmentId
+        }
+      },
+      update: {},
+      create: {
+        memberId,
+        departmentId
+      }
+    });
+
+    invalidateDeptCache();
+
+    // Return updated department
+    const updated = await prisma.department.findUnique({
+      where: { id: departmentId },
+      include: {
+        _count: { select: { members: true } },
+        members: {
+          include: {
+            member: {
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+                phone: true,
+                churchGroup: true,
+                role: true
+              }
+            }
+          }
+        }
+      }
+    });
+
+    res.status(201).json(updated);
+  } catch (error: any) {
+    console.error('Error assigning member to department:', error);
+    res.status(500).json({ error: 'Failed to assign member to department' });
+  }
+});
+
+// DELETE /api/departments/:id/members/:memberId - Remove member from department
+departmentRouter.delete('/:id/members/:memberId', async (req: Request, res: Response) => {
+  try {
+    const departmentId = req.params.id as string;
+    const memberId = req.params.memberId as string;
+
+    await prisma.memberDepartment.deleteMany({
+      where: {
+        departmentId,
+        memberId
+      }
+    });
+
+    invalidateDeptCache();
+
+    res.json({ success: true, message: 'Member removed from department' });
+  } catch (error: any) {
+    console.error('Error removing member from department:', error);
+    res.status(500).json({ error: 'Failed to remove member from department' });
+  }
+});

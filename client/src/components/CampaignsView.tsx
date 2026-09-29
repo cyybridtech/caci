@@ -18,7 +18,10 @@ import {
   ChevronRight,
   ShieldCheck,
   Search,
-  Filter
+  Filter,
+  Edit2,
+  Trash2,
+  X
 } from 'lucide-react';
 import { PledgeCampaign, MemberPledge, Member, PaymentMethod } from '../types/index.ts';
 import { api } from '../services/api.ts';
@@ -37,6 +40,7 @@ export const CampaignsView: React.FC<CampaignsViewProps> = ({ members, onOpenRec
   // Modal states
   const [isCreateCampaignOpen, setIsCreateCampaignOpen] = useState(false);
   const [isRecordPledgeOpen, setIsRecordPledgeOpen] = useState(false);
+  const [isEditPledgeOpen, setIsEditPledgeOpen] = useState(false);
   const [isRecordPaymentOpen, setIsRecordPaymentOpen] = useState(false);
   const [isRemindModalOpen, setIsRemindModalOpen] = useState(false);
 
@@ -53,6 +57,16 @@ export const CampaignsView: React.FC<CampaignsViewProps> = ({ members, onOpenRec
   });
 
   const [newPledgeData, setNewPledgeData] = useState({
+    memberId: '',
+    donorName: '',
+    donorPhone: '',
+    pledgedAmount: '',
+    dueDate: '',
+    notes: ''
+  });
+
+  const [editPledgeData, setEditPledgeData] = useState({
+    id: '',
     memberId: '',
     donorName: '',
     donorPhone: '',
@@ -135,6 +149,54 @@ export const CampaignsView: React.FC<CampaignsViewProps> = ({ members, onOpenRec
       await fetchCampaigns();
     } catch (err: any) {
       alert(err.message || 'Failed to record pledge');
+    }
+  };
+
+  const handleOpenEditPledge = (pledge: MemberPledge) => {
+    setEditPledgeData({
+      id: pledge.id,
+      memberId: pledge.memberId || '',
+      donorName: pledge.donorName || (pledge.member ? `${pledge.member.firstName} ${pledge.member.lastName}` : ''),
+      donorPhone: pledge.donorPhone || pledge.member?.phone || '',
+      pledgedAmount: String(pledge.pledgedAmount),
+      dueDate: pledge.dueDate ? new Date(pledge.dueDate).toISOString().split('T')[0] : '',
+      notes: pledge.notes || ''
+    });
+    setIsEditPledgeOpen(true);
+  };
+
+  const handleUpdatePledgeSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editPledgeData.id || !editPledgeData.pledgedAmount) return;
+
+    try {
+      await api.updatePledge(editPledgeData.id, {
+        memberId: editPledgeData.memberId || undefined,
+        donorName: editPledgeData.donorName || undefined,
+        donorPhone: editPledgeData.donorPhone || undefined,
+        pledgedAmount: Number(editPledgeData.pledgedAmount),
+        dueDate: editPledgeData.dueDate || undefined,
+        notes: editPledgeData.notes || undefined
+      });
+      setIsEditPledgeOpen(false);
+      setFeedback('Pledge updated successfully!');
+      await fetchCampaigns();
+    } catch (err: any) {
+      alert(err.message || 'Failed to update pledge');
+    }
+  };
+
+  const handleDeletePledge = async (pledgeId: string) => {
+    if (!window.confirm('Are you sure you want to delete this pledge and its recorded payments? This action cannot be undone.')) {
+      return;
+    }
+
+    try {
+      await api.deletePledge(pledgeId);
+      setFeedback('Pledge deleted successfully!');
+      await fetchCampaigns();
+    } catch (err: any) {
+      alert(err.message || 'Failed to delete pledge');
     }
   };
 
@@ -440,20 +502,36 @@ export const CampaignsView: React.FC<CampaignsViewProps> = ({ members, onOpenRec
                           </span>
                         </td>
                         <td className="py-2.5 px-3 text-right">
-                          {pledge.status !== 'FULFILLED' ? (
+                          <div className="flex items-center justify-end space-x-1.5">
+                            {pledge.status !== 'FULFILLED' && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setSelectedPledge(pledge);
+                                  setIsRecordPaymentOpen(true);
+                                }}
+                                className="px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-[11px] shadow-xs transition"
+                              >
+                                Pay
+                              </button>
+                            )}
                             <button
                               type="button"
-                              onClick={() => {
-                                setSelectedPledge(pledge);
-                                setIsRecordPaymentOpen(true);
-                              }}
-                              className="px-3 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-[11px] shadow-xs transition"
+                              onClick={() => handleOpenEditPledge(pledge)}
+                              className="p-1.5 rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 transition"
+                              title="Edit Pledge"
                             >
-                              Pay Installment
+                              <Edit2 className="w-3.5 h-3.5" />
                             </button>
-                          ) : (
-                            <span className="text-[10px] text-emerald-600 font-extrabold">Completed</span>
-                          )}
+                            <button
+                              type="button"
+                              onClick={() => handleDeletePledge(pledge.id)}
+                              className="p-1.5 rounded-lg bg-rose-50 text-rose-600 hover:bg-rose-100 transition"
+                              title="Delete Pledge"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     );
@@ -707,6 +785,108 @@ export const CampaignsView: React.FC<CampaignsViewProps> = ({ members, onOpenRec
                   className="px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-xs shadow-sm"
                 >
                   Confirm & Issue Receipt
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Edit Pledge */}
+      {isEditPledgeOpen && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl p-6 max-w-md w-full shadow-2xl space-y-4 animate-in fade-in zoom-in-95">
+            <div className="flex items-center justify-between">
+              <h3 className="font-extrabold text-base text-slate-900">Edit Pledge</h3>
+              <button type="button" onClick={() => setIsEditPledgeOpen(false)} className="p-1.5 rounded-xl hover:bg-slate-100 text-slate-500">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <form onSubmit={handleUpdatePledgeSubmit} className="space-y-3.5">
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Link to Member (optional)</label>
+                <select
+                  value={editPledgeData.memberId}
+                  onChange={(e) => setEditPledgeData({ ...editPledgeData, memberId: e.target.value })}
+                  className="w-full px-3 py-2 border rounded-xl text-xs font-medium text-slate-900"
+                >
+                  <option value="">— Anonymous / No Link —</option>
+                  {members.map((m) => (
+                    <option key={m.id} value={m.id}>
+                      {m.firstName} {m.lastName} ({m.churchGroup})
+                    </option>
+                  ))}
+                </select>
+              </div>
+              {!editPledgeData.memberId && (
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Donor Name</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. Kofi Mensah"
+                      value={editPledgeData.donorName}
+                      onChange={(e) => setEditPledgeData({ ...editPledgeData, donorName: e.target.value })}
+                      className="w-full px-3 py-2 border rounded-xl text-xs font-medium text-slate-900"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Donor Phone</label>
+                    <input
+                      type="tel"
+                      placeholder="0244..."
+                      value={editPledgeData.donorPhone}
+                      onChange={(e) => setEditPledgeData({ ...editPledgeData, donorPhone: e.target.value })}
+                      className="w-full px-3 py-2 border rounded-xl text-xs font-medium text-slate-900"
+                    />
+                  </div>
+                </div>
+              )}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Pledged Amount (GH₵)</label>
+                  <input
+                    type="number"
+                    required
+                    min="1"
+                    value={editPledgeData.pledgedAmount}
+                    onChange={(e) => setEditPledgeData({ ...editPledgeData, pledgedAmount: e.target.value })}
+                    className="w-full px-3 py-2 border rounded-xl text-xs font-medium text-slate-900 font-mono"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Due Date</label>
+                  <input
+                    type="date"
+                    value={editPledgeData.dueDate}
+                    onChange={(e) => setEditPledgeData({ ...editPledgeData, dueDate: e.target.value })}
+                    className="w-full px-3 py-2 border rounded-xl text-xs font-medium text-slate-900"
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Notes</label>
+                <input
+                  type="text"
+                  placeholder="Optional notes..."
+                  value={editPledgeData.notes}
+                  onChange={(e) => setEditPledgeData({ ...editPledgeData, notes: e.target.value })}
+                  className="w-full px-3 py-2 border rounded-xl text-xs font-medium text-slate-900"
+                />
+              </div>
+              <div className="flex justify-end space-x-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setIsEditPledgeOpen(false)}
+                  className="px-4 py-2 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-100"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-extrabold text-xs shadow-sm"
+                >
+                  Save Changes
                 </button>
               </div>
             </form>

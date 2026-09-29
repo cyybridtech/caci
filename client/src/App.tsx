@@ -47,7 +47,7 @@ export const App: React.FC = () => {
     | 'celebrations'
     | 'messaging'
     | 'users'
-  >('checkin');
+  >(user?.role === 'FINANCE' ? 'finances' : user?.role === 'MEDIA_TEAM' ? 'analytics' : 'checkin');
 
   // Core data states
   const [activeSession, setActiveSession] = useState<ServiceSession | null>(null);
@@ -507,8 +507,23 @@ export const App: React.FC = () => {
             {activeTab === 'departments' && (
               <DepartmentsView
                 departments={departments}
+                members={members}
                 onCreateDepartment={handleCreateDepartment}
                 onNavigateToMessaging={handleNavigateToMessaging}
+                onAddMember={async (deptId, memberId) => {
+                  const updated = await api.addMemberToDepartment(deptId, memberId);
+                  setDepartments((prev) => prev.map((d) => (d.id === deptId ? updated : d)));
+                }}
+                onRemoveMember={async (deptId, memberId) => {
+                  await api.removeMemberFromDepartment(deptId, memberId);
+                  setDepartments((prev) =>
+                    prev.map((d) =>
+                      d.id === deptId
+                        ? { ...d, members: (d.members || []).filter((m) => m.member.id !== memberId) }
+                        : d
+                    )
+                  );
+                }}
               />
             )}
 

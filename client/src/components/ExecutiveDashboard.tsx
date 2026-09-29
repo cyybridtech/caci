@@ -326,7 +326,7 @@ export const ExecutiveDashboard: React.FC = () => {
                       : 'text-slate-600 hover:text-slate-900'
                   }`}
                 >
-                  Group 1 vs 2
+                  Cell Comparison
                 </button>
               </div>
 
@@ -370,11 +370,11 @@ export const ExecutiveDashboard: React.FC = () => {
                 <>
                   <div className="flex items-center space-x-1.5">
                     <span className="w-3 h-0.5 bg-blue-600 rounded"></span>
-                    <span className="text-blue-900 font-bold">Group 1</span>
+                    <span className="text-blue-900 font-bold">Joy</span>
                   </div>
                   <div className="flex items-center space-x-1.5">
                     <span className="w-3 h-0.5 bg-purple-600 rounded"></span>
-                    <span className="text-purple-900 font-bold">Group 2</span>
+                    <span className="text-purple-900 font-bold">Faith</span>
                   </div>
                 </>
               )}
@@ -587,8 +587,8 @@ export const ExecutiveDashboard: React.FC = () => {
                 <thead className="bg-slate-50 text-slate-600 font-bold border-b border-slate-200 text-[11px] uppercase">
                   <tr>
                     <th className="py-2.5 px-3">{timeframe === 'WEEKLY' ? 'Service Session' : 'Month'}</th>
-                    <th className="py-2.5 px-3 text-center">Group 1</th>
-                    <th className="py-2.5 px-3 text-center">Group 2</th>
+                    <th className="py-2.5 px-3 text-center">Joy</th>
+                    <th className="py-2.5 px-3 text-center">Faith</th>
                     <th className="py-2.5 px-3 text-center">
                       {timeframe === 'WEEKLY' ? 'Total Present' : 'Avg / Service'}
                     </th>

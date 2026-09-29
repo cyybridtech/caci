@@ -223,6 +223,12 @@ memberRouter.get('/:id', async (req: Request, res: Response) => {
       return res.status(403).json({ error: 'You can only view members from your assigned cell' });
     }
 
+    // Cell leaders cannot see member finances (pledges, tithes, welfare, offerings)
+    if (currentUser.role === UserRole.CELL_LEADER) {
+      (member as any).contributions = [];
+      (member as any).pledges = [];
+    }
+
     res.json(member);
   } catch (error: any) {
     console.error('Error fetching member:', error);
@@ -406,10 +412,49 @@ memberRouter.put('/:id', async (req: Request, res: Response) => {
         assimilationStage: assimilationStage || undefined,
         invitedBy: invitedBy !== undefined ? (invitedBy ? invitedBy.trim() : null) : undefined,
         notes: notes !== undefined ? (notes ? notes.trim() : null) : undefined
+      },
+      include: {
+        departments: {
+          select: {
+            departmentId: true,
+            department: {
+              select: { id: true, name: true }
+            }
+          }
+        }
       }
     });
 
-    res.json(updated);
+    const { departmentIds } = req.body;
+    if (departmentIds && Array.isArray(departmentIds)) {
+      await prisma.memberDepartment.deleteMany({
+        where: { memberId: id }
+      });
+      if (departmentIds.length > 0) {
+        await prisma.memberDepartment.createMany({
+          data: departmentIds.map((deptId: string) => ({
+            memberId: id,
+            departmentId: deptId
+          }))
+        });
+      }
+    }
+
+    const finalUpdated = await prisma.member.findUnique({
+      where: { id },
+      include: {
+        departments: {
+          select: {
+            departmentId: true,
+            department: {
+              select: { id: true, name: true }
+            }
+          }
+        }
+      }
+    });
+
+    res.json(finalUpdated || updated);
   } catch (error: any) {
     console.error('Error updating member:', error);
     res.status(500).json({ error: 'Failed to update member' });

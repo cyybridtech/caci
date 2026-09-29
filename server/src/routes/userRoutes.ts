@@ -8,23 +8,10 @@ export const userRouter = Router();
 
 userRouter.use(requireAuth);
 
-// GET /api/users - Admin gets all users, Cell leader gets users in their cell
-userRouter.get('/', async (req: Request, res: Response) => {
+// GET /api/users - Only Admin gets all users
+userRouter.get('/', requireRole(UserRole.ADMIN), async (req: Request, res: Response) => {
   try {
-    const { role, cell } = req.user!;
-    const whereClause: any = {};
-
-    if (role === 'CELL_LEADER') {
-      if (!cell) {
-        return res.json([]);
-      }
-      whereClause.cell = cell as ChurchGroup;
-    } else if (role !== 'ADMIN') {
-      return res.status(403).json({ error: 'Access denied: Admin or Cell Leader role required' });
-    }
-
     const users = await prisma.user.findMany({
-      where: whereClause,
       select: {
         id: true,
         username: true,
@@ -43,8 +30,8 @@ userRouter.get('/', async (req: Request, res: Response) => {
   }
 });
 
-// POST /api/users - Admin or Cell Leader creates user
-userRouter.post('/', async (req: Request, res: Response) => {
+// POST /api/users - Admin creates user
+userRouter.post('/', requireRole(UserRole.ADMIN), async (req: Request, res: Response) => {
   try {
     const currentUser = req.user!;
     const { username, role, cell } = req.body;
@@ -63,18 +50,7 @@ userRouter.post('/', async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'Invalid role specified' });
     }
 
-    // Permission check
-    let assignedCell = cell ? (cell as ChurchGroup) : null;
-    if (currentUser.role === UserRole.CELL_LEADER) {
-      // Cell leaders can only create users within their own cell
-      if (role !== UserRole.CELL_LEADER) {
-        return res.status(403).json({ error: 'Cell leaders can only manage cell leader accounts for their cell' });
-      }
-      assignedCell = currentUser.cell as ChurchGroup;
-    } else if (currentUser.role !== UserRole.ADMIN) {
-      return res.status(403).json({ error: 'Access denied' });
-    }
-
+    const assignedCell = cell ? (cell as ChurchGroup) : null;
     if (role === UserRole.CELL_LEADER && !assignedCell) {
       return res.status(400).json({ error: 'Cell assignment is required for Cell Leaders' });
     }
@@ -111,8 +87,8 @@ userRouter.post('/', async (req: Request, res: Response) => {
   }
 });
 
-// DELETE /api/users/:id - Admin or Cell Leader deletes user
-userRouter.delete('/:id', async (req: Request, res: Response) => {
+// DELETE /api/users/:id - Admin deletes user
+userRouter.delete('/:id', requireRole(UserRole.ADMIN), async (req: Request, res: Response) => {
   try {
     const id = req.params.id as string;
     const currentUser = req.user!;
@@ -126,14 +102,6 @@ userRouter.delete('/:id', async (req: Request, res: Response) => {
       return res.status(404).json({ error: 'User not found' });
     }
 
-    if (currentUser.role === UserRole.CELL_LEADER) {
-      if (targetUser.cell !== currentUser.cell) {
-        return res.status(403).json({ error: 'You can only delete users in your cell' });
-      }
-    } else if (currentUser.role !== UserRole.ADMIN) {
-      return res.status(403).json({ error: 'Access denied' });
-    }
-
     await prisma.user.delete({ where: { id } });
     res.json({ success: true, message: 'User deleted successfully' });
   } catch (error: any) {
@@ -143,22 +111,13 @@ userRouter.delete('/:id', async (req: Request, res: Response) => {
 });
 
 // PATCH /api/users/:id/reset-password - Resets password to username
-userRouter.patch('/:id/reset-password', async (req: Request, res: Response) => {
+userRouter.patch('/:id/reset-password', requireRole(UserRole.ADMIN), async (req: Request, res: Response) => {
   try {
     const id = req.params.id as string;
-    const currentUser = req.user!;
 
     const targetUser = await prisma.user.findUnique({ where: { id } });
     if (!targetUser) {
       return res.status(404).json({ error: 'User not found' });
-    }
-
-    if (currentUser.role === UserRole.CELL_LEADER) {
-      if (targetUser.cell !== currentUser.cell) {
-        return res.status(403).json({ error: 'You can only reset passwords for users in your cell' });
-      }
-    } else if (currentUser.role !== UserRole.ADMIN) {
-      return res.status(403).json({ error: 'Access denied' });
     }
 
     const hashedPassword = await bcrypt.hash(targetUser.username, 12);

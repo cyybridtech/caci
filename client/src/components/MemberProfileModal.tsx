@@ -21,6 +21,7 @@ import {
 } from 'lucide-react';
 import { Member, ChurchGroup, FinancialContribution, MemberPledge } from '../types/index.ts';
 import { api } from '../services/api.ts';
+import { useAuth } from '../context/AuthContext.tsx';
 
 interface MemberProfileModalProps {
   member: Member;
@@ -33,6 +34,8 @@ export const MemberProfileModal: React.FC<MemberProfileModalProps> = ({
   onClose,
   onEdit
 }) => {
+  const { user } = useAuth();
+  const isCellLeader = user?.role === 'CELL_LEADER';
   const [activeTab, setActiveTab] = useState<'profile' | 'tithes' | 'welfare' | 'pledges' | 'attendance' | 'allGiving'>('profile');
   const [fullMember, setFullMember] = useState<Member>(initialMember);
   const [isLoading, setIsLoading] = useState(true);
@@ -161,25 +164,29 @@ export const MemberProfileModal: React.FC<MemberProfileModalProps> = ({
 
           {/* Quick Metrics Bar */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-6 pt-4 border-t border-slate-800/80 text-xs">
-            <div className="bg-slate-950/60 p-3 rounded-2xl border border-slate-800">
-              <span className="text-slate-400 font-semibold block">Total Tithes</span>
-              <span className="text-base font-black text-amber-400 mt-0.5 block">
-                GH₵ {totalTithes.toLocaleString('en-US', { minimumFractionDigits: 2 })}
-              </span>
-            </div>
-            <div className="bg-slate-950/60 p-3 rounded-2xl border border-slate-800">
-              <span className="text-slate-400 font-semibold block">Total Welfare</span>
-              <span className="text-base font-black text-emerald-400 mt-0.5 block">
-                GH₵ {totalWelfare.toLocaleString('en-US', { minimumFractionDigits: 2 })}
-              </span>
-            </div>
-            <div className="bg-slate-950/60 p-3 rounded-2xl border border-slate-800">
-              <span className="text-slate-400 font-semibold block">Active Pledges</span>
-              <span className="text-base font-black text-indigo-400 mt-0.5 block">
-                GH₵ {totalPledgePaid.toLocaleString('en-US', { minimumFractionDigits: 2 })} / {totalPledged.toLocaleString('en-US', { minimumFractionDigits: 2 })}
-              </span>
-            </div>
-            <div className="bg-slate-950/60 p-3 rounded-2xl border border-slate-800">
+            {!isCellLeader && (
+              <>
+                <div className="bg-slate-950/60 p-3 rounded-2xl border border-slate-800">
+                  <span className="text-slate-400 font-semibold block">Total Tithes</span>
+                  <span className="text-base font-black text-amber-400 mt-0.5 block">
+                    GH₵ {totalTithes.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                  </span>
+                </div>
+                <div className="bg-slate-950/60 p-3 rounded-2xl border border-slate-800">
+                  <span className="text-slate-400 font-semibold block">Total Welfare</span>
+                  <span className="text-base font-black text-emerald-400 mt-0.5 block">
+                    GH₵ {totalWelfare.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                  </span>
+                </div>
+                <div className="bg-slate-950/60 p-3 rounded-2xl border border-slate-800">
+                  <span className="text-slate-400 font-semibold block">Active Pledges</span>
+                  <span className="text-base font-black text-indigo-400 mt-0.5 block">
+                    GH₵ {totalPledgePaid.toLocaleString('en-US', { minimumFractionDigits: 2 })} / {totalPledged.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                  </span>
+                </div>
+              </>
+            )}
+            <div className={`bg-slate-950/60 p-3 rounded-2xl border border-slate-800 ${isCellLeader ? 'col-span-2 sm:col-span-4' : ''}`}>
               <span className="text-slate-400 font-semibold block">Attendance</span>
               <span className="text-base font-black text-blue-400 mt-0.5 block">
                 {fullMember._count?.attendance || 0} Service(s)
@@ -202,53 +209,57 @@ export const MemberProfileModal: React.FC<MemberProfileModalProps> = ({
             <span>Profile & Bio</span>
           </button>
 
-          <button
-            onClick={() => setActiveTab('tithes')}
-            className={`px-4 py-2 rounded-xl text-xs font-bold transition flex items-center space-x-1.5 shrink-0 ${
-              activeTab === 'tithes'
-                ? 'bg-amber-600 text-white shadow-md shadow-amber-900/40'
-                : 'text-slate-400 hover:text-white hover:bg-slate-800'
-            }`}
-          >
-            <DollarSign className="w-3.5 h-3.5" />
-            <span>Tithes ({tithes.length})</span>
-          </button>
+          {!isCellLeader && (
+            <>
+              <button
+                onClick={() => setActiveTab('tithes')}
+                className={`px-4 py-2 rounded-xl text-xs font-bold transition flex items-center space-x-1.5 shrink-0 ${
+                  activeTab === 'tithes'
+                    ? 'bg-amber-600 text-white shadow-md shadow-amber-900/40'
+                    : 'text-slate-400 hover:text-white hover:bg-slate-800'
+                }`}
+              >
+                <DollarSign className="w-3.5 h-3.5" />
+                <span>Tithes ({tithes.length})</span>
+              </button>
 
-          <button
-            onClick={() => setActiveTab('welfare')}
-            className={`px-4 py-2 rounded-xl text-xs font-bold transition flex items-center space-x-1.5 shrink-0 ${
-              activeTab === 'welfare'
-                ? 'bg-emerald-600 text-white shadow-md shadow-emerald-900/40'
-                : 'text-slate-400 hover:text-white hover:bg-slate-800'
-            }`}
-          >
-            <Heart className="w-3.5 h-3.5" />
-            <span>Welfare ({welfare.length})</span>
-          </button>
+              <button
+                onClick={() => setActiveTab('welfare')}
+                className={`px-4 py-2 rounded-xl text-xs font-bold transition flex items-center space-x-1.5 shrink-0 ${
+                  activeTab === 'welfare'
+                    ? 'bg-emerald-600 text-white shadow-md shadow-emerald-900/40'
+                    : 'text-slate-400 hover:text-white hover:bg-slate-800'
+                }`}
+              >
+                <Heart className="w-3.5 h-3.5" />
+                <span>Welfare ({welfare.length})</span>
+              </button>
 
-          <button
-            onClick={() => setActiveTab('pledges')}
-            className={`px-4 py-2 rounded-xl text-xs font-bold transition flex items-center space-x-1.5 shrink-0 ${
-              activeTab === 'pledges'
-                ? 'bg-indigo-600 text-white shadow-md shadow-indigo-900/40'
-                : 'text-slate-400 hover:text-white hover:bg-slate-800'
-            }`}
-          >
-            <Building className="w-3.5 h-3.5" />
-            <span>Pledges ({pledges.length})</span>
-          </button>
+              <button
+                onClick={() => setActiveTab('pledges')}
+                className={`px-4 py-2 rounded-xl text-xs font-bold transition flex items-center space-x-1.5 shrink-0 ${
+                  activeTab === 'pledges'
+                    ? 'bg-indigo-600 text-white shadow-md shadow-indigo-900/40'
+                    : 'text-slate-400 hover:text-white hover:bg-slate-800'
+                }`}
+              >
+                <Building className="w-3.5 h-3.5" />
+                <span>Pledges ({pledges.length})</span>
+              </button>
 
-          <button
-            onClick={() => setActiveTab('allGiving')}
-            className={`px-4 py-2 rounded-xl text-xs font-bold transition flex items-center space-x-1.5 shrink-0 ${
-              activeTab === 'allGiving'
-                ? 'bg-purple-600 text-white shadow-md shadow-purple-900/40'
-                : 'text-slate-400 hover:text-white hover:bg-slate-800'
-            }`}
-          >
-            <Gift className="w-3.5 h-3.5" />
-            <span>Other Offerings ({otherGiving.length})</span>
-          </button>
+              <button
+                onClick={() => setActiveTab('allGiving')}
+                className={`px-4 py-2 rounded-xl text-xs font-bold transition flex items-center space-x-1.5 shrink-0 ${
+                  activeTab === 'allGiving'
+                    ? 'bg-purple-600 text-white shadow-md shadow-purple-900/40'
+                    : 'text-slate-400 hover:text-white hover:bg-slate-800'
+                }`}
+              >
+                <Gift className="w-3.5 h-3.5" />
+                <span>Other Offerings ({otherGiving.length})</span>
+              </button>
+            </>
+          )}
 
           <button
             onClick={() => setActiveTab('attendance')}
