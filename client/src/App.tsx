@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Header } from './components/Header.tsx';
 import { CheckInDesk } from './components/CheckInDesk.tsx';
 import { MembersDirectory } from './components/MembersDirectory.tsx';
