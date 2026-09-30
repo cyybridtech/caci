@@ -35,7 +35,7 @@ import {
 } from './types/index.ts';
 
 const isRoleAuthorizedForTab = (tab: string, role?: UserRole): boolean => {
-  if (!role || role === 'ADMIN') return true;
+  if (!role || role === 'ADMIN' || role === 'DEVELOPER') return true;
   if (role === 'CELL_LEADER') {
     return ['checkin', 'members', 'attendance-history', 'pipeline'].includes(tab);
   }
@@ -57,6 +57,25 @@ const getDefaultTabForRole = (role?: UserRole): 'checkin' | 'finances' | 'analyt
 
 export const App: React.FC = () => {
   const { user, isAuthenticated, logout } = useAuth();
+  const isDeveloper = user?.role === 'DEVELOPER';
+
+  // Developer role preview / impersonation state
+  const [developerPreviewRole, setDeveloperPreviewRole] = useState<UserRole | null>(null);
+  const [developerPreviewCell, setDeveloperPreviewCell] = useState<ChurchGroup | null>(null);
+
+  const effectiveUser = useMemo(() => {
+    if (!user) return null;
+    if (isDeveloper && developerPreviewRole) {
+      return {
+        ...user,
+        role: developerPreviewRole,
+        cell: developerPreviewCell || undefined
+      };
+    }
+    return user;
+  }, [user, isDeveloper, developerPreviewRole, developerPreviewCell]);
+
+  const effectiveRole = effectiveUser?.role;
 
   const [activeTab, setActiveTab] = useState<
     | 'checkin'
@@ -70,14 +89,14 @@ export const App: React.FC = () => {
     | 'celebrations'
     | 'messaging'
     | 'users'
-  >(user?.role === 'FINANCE' ? 'finances' : user?.role === 'MEDIA_TEAM' ? 'analytics' : 'checkin');
+  >(user?.role === 'FINANCE' ? 'finances' : 'checkin');
 
-  // Ensure activeTab matches role permissions whenever user changes
+  // Ensure activeTab matches role permissions whenever user or preview role changes
   useEffect(() => {
-    if (user && !isRoleAuthorizedForTab(activeTab, user.role)) {
-      setActiveTab(getDefaultTabForRole(user.role));
+    if (effectiveRole && !isRoleAuthorizedForTab(activeTab, effectiveRole)) {
+      setActiveTab(getDefaultTabForRole(effectiveRole));
     }
-  }, [user, activeTab]);
+  }, [effectiveRole, activeTab]);
 
   // Core data states
   const [activeSession, setActiveSession] = useState<ServiceSession | null>(null);
@@ -607,9 +626,44 @@ export const App: React.FC = () => {
         onSync={handleManualSync}
         isSyncing={isSyncing}
         todayCelebrantsCount={todayCelebrantsCount}
-        currentUser={user}
+        currentUser={effectiveUser}
         onLogout={handleLogout}
+        isDeveloper={isDeveloper}
+        developerPreviewRole={developerPreviewRole}
+        developerPreviewCell={developerPreviewCell}
+        onSetDeveloperPreview={(r, c) => {
+          setDeveloperPreviewRole(r);
+          setDeveloperPreviewCell(c);
+          if (r) {
+            setActiveTab(getDefaultTabForRole(r));
+          }
+        }}
       />
+
+      {/* Developer Impersonation Active Banner */}
+      {isDeveloper && developerPreviewRole && (
+        <div className="bg-gradient-to-r from-amber-600 via-purple-600 to-indigo-600 text-white px-4 sm:px-8 py-2.5 text-xs font-bold flex flex-wrap items-center justify-between gap-2 shadow-md">
+          <div className="flex items-center space-x-2">
+            <span className="p-1 rounded bg-black/20 text-white">🛠️</span>
+            <span>
+              Developer Impersonation Active: You are currently viewing the system as{' '}
+              <strong className="underline uppercase tracking-wide">
+                {developerPreviewRole.replace('_', ' ')}
+                {developerPreviewCell ? ` (${developerPreviewCell} Cell)` : ''}
+              </strong>
+            </span>
+          </div>
+          <button
+            onClick={() => {
+              setDeveloperPreviewRole(null);
+              setDeveloperPreviewCell(null);
+            }}
+            className="px-3 py-1 bg-white text-slate-900 rounded-xl text-[11px] font-extrabold hover:bg-slate-100 transition shadow-sm cursor-pointer"
+          >
+            Exit Preview (Return to Full Developer Access)
+          </button>
+        </div>
+      )}
 
       {/* Main Workspace Body */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
@@ -620,7 +674,7 @@ export const App: React.FC = () => {
           </div>
         ) : (
           <>
-            {activeTab === 'checkin' && isRoleAuthorizedForTab('checkin', user?.role) && (
+            {activeTab === 'checkin' && isRoleAuthorizedForTab('checkin', effectiveRole) && (
               <CheckInDesk
                 session={activeSession}
                 members={members}
@@ -637,7 +691,7 @@ export const App: React.FC = () => {
               />
             )}
 
-            {activeTab === 'members' && isRoleAuthorizedForTab('members', user?.role) && (
+            {activeTab === 'members' && isRoleAuthorizedForTab('members', effectiveRole) && (
               <MembersDirectory
                 members={members}
                 departments={departments}
@@ -649,7 +703,7 @@ export const App: React.FC = () => {
               />
             )}
 
-            {activeTab === 'attendance-history' && isRoleAuthorizedForTab('attendance-history', user?.role) && (
+            {activeTab === 'attendance-history' && isRoleAuthorizedForTab('attendance-history', effectiveRole) && (
               <AttendanceAuditView
                 members={members}
                 sessions={sessions}
@@ -659,16 +713,16 @@ export const App: React.FC = () => {
               />
             )}
 
-            {activeTab === 'analytics' && isRoleAuthorizedForTab('analytics', user?.role) && <ExecutiveDashboard />}
+            {activeTab === 'analytics' && isRoleAuthorizedForTab('analytics', effectiveRole) && <ExecutiveDashboard />}
 
-            {activeTab === 'pipeline' && isRoleAuthorizedForTab('pipeline', user?.role) && (
+            {activeTab === 'pipeline' && isRoleAuthorizedForTab('pipeline', effectiveRole) && (
               <AssimilationPipeline
                 members={members}
                 onUpdateStage={handleUpdateAssimilationStage}
               />
             )}
 
-            {activeTab === 'departments' && isRoleAuthorizedForTab('departments', user?.role) && (
+            {activeTab === 'departments' && isRoleAuthorizedForTab('departments', effectiveRole) && (
               <DepartmentsView
                 departments={departments}
                 members={members}
@@ -691,7 +745,7 @@ export const App: React.FC = () => {
               />
             )}
 
-            {activeTab === 'finances' && isRoleAuthorizedForTab('finances', user?.role) && (
+            {activeTab === 'finances' && isRoleAuthorizedForTab('finances', effectiveRole) && (
               <FinancesView
                 contributions={contributions}
                 summary={financialSummary}
@@ -703,11 +757,11 @@ export const App: React.FC = () => {
               />
             )}
 
-            {activeTab === 'campaigns' && isRoleAuthorizedForTab('campaigns', user?.role) && <CampaignsView members={members} />}
+            {activeTab === 'campaigns' && isRoleAuthorizedForTab('campaigns', effectiveRole) && <CampaignsView members={members} />}
 
-            {activeTab === 'celebrations' && isRoleAuthorizedForTab('celebrations', user?.role) && <CelebrationsView />}
+            {activeTab === 'celebrations' && isRoleAuthorizedForTab('celebrations', effectiveRole) && <CelebrationsView />}
 
-            {activeTab === 'messaging' && isRoleAuthorizedForTab('messaging', user?.role) && (
+            {activeTab === 'messaging' && isRoleAuthorizedForTab('messaging', effectiveRole) && (
               <MessagingView
                 session={activeSession}
                 departments={departments}
@@ -720,7 +774,7 @@ export const App: React.FC = () => {
               />
             )}
 
-            {activeTab === 'users' && isRoleAuthorizedForTab('users', user?.role) && <UserManagement />}
+            {activeTab === 'users' && isRoleAuthorizedForTab('users', effectiveRole) && <UserManagement />}
           </>
         )}
       </main>

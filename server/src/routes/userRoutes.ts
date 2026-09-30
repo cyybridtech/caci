@@ -8,10 +8,19 @@ export const userRouter = Router();
 
 userRouter.use(requireAuth);
 
-// GET /api/users - Only Admin gets all users
+// GET /api/users - Only Admin & Developer gets users (Developer accounts are hidden from Admin)
 userRouter.get('/', requireRole(UserRole.ADMIN), async (req: Request, res: Response) => {
   try {
+    const currentUser = req.user!;
+    const whereClause: any = {};
+
+    // Standard Admins cannot see Developer accounts in the user management table
+    if (currentUser.role !== 'DEVELOPER') {
+      whereClause.role = { not: UserRole.DEVELOPER };
+    }
+
     const users = await prisma.user.findMany({
+      where: whereClause,
       select: {
         id: true,
         username: true,
@@ -46,6 +55,10 @@ userRouter.post('/', requireRole(UserRole.ADMIN), async (req: Request, res: Resp
     }
 
     const validRoles: UserRole[] = [UserRole.ADMIN, UserRole.CELL_LEADER, UserRole.MEDIA_TEAM, UserRole.FINANCE];
+    if (currentUser.role === 'DEVELOPER') {
+      validRoles.push(UserRole.DEVELOPER);
+    }
+
     if (!validRoles.includes(role as UserRole)) {
       return res.status(400).json({ error: 'Invalid role specified' });
     }
@@ -102,6 +115,10 @@ userRouter.delete('/:id', requireRole(UserRole.ADMIN), async (req: Request, res:
       return res.status(404).json({ error: 'User not found' });
     }
 
+    if (targetUser.role === UserRole.DEVELOPER && currentUser.role !== 'DEVELOPER') {
+      return res.status(403).json({ error: 'Forbidden: Cannot delete developer account' });
+    }
+
     await prisma.user.delete({ where: { id } });
     res.json({ success: true, message: 'User deleted successfully' });
   } catch (error: any) {
@@ -114,10 +131,15 @@ userRouter.delete('/:id', requireRole(UserRole.ADMIN), async (req: Request, res:
 userRouter.patch('/:id/reset-password', requireRole(UserRole.ADMIN), async (req: Request, res: Response) => {
   try {
     const id = req.params.id as string;
+    const currentUser = req.user!;
 
     const targetUser = await prisma.user.findUnique({ where: { id } });
     if (!targetUser) {
       return res.status(404).json({ error: 'User not found' });
+    }
+
+    if (targetUser.role === UserRole.DEVELOPER && currentUser.role !== 'DEVELOPER') {
+      return res.status(403).json({ error: 'Forbidden: Cannot reset developer account password' });
     }
 
     const hashedPassword = await bcrypt.hash(targetUser.username, 12);

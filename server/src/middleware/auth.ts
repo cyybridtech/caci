@@ -1,7 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 
-export type UserRole = 'ADMIN' | 'CELL_LEADER' | 'MEDIA_TEAM' | 'FINANCE';
+export type UserRole = 'ADMIN' | 'CELL_LEADER' | 'MEDIA_TEAM' | 'FINANCE' | 'DEVELOPER';
 export type CellGroup = 'JOY' | 'FAITH' | 'HOPE' | 'LOVE';
 
 export interface AuthUser {
@@ -43,13 +43,19 @@ export const requireAuth = (req: Request, res: Response, next: NextFunction): vo
 
 /**
  * requireRole — restricts route to specific roles (used after requireAuth)
+ * Developer role automatically has universal super-access to all routes.
  */
 export const requireRole = (...roles: UserRole[]) => {
   return (req: Request, res: Response, next: NextFunction): void => {
-    if (!req.user || !roles.includes(req.user.role)) {
+    if (!req.user) {
       res.status(403).json({ error: 'Forbidden: Insufficient permissions' });
       return;
     }
-    next();
+    if (req.user.role === 'DEVELOPER' || roles.includes(req.user.role)) {
+      next();
+      return;
+    }
+    res.status(403).json({ error: 'Forbidden: Insufficient permissions' });
   };
 };
+

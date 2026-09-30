@@ -21,6 +21,7 @@ enum UserRole {
   CELL_LEADER
   MEDIA_TEAM
   FINANCE
+  DEVELOPER
 }
 
 enum MemberStatus {

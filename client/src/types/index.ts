@@ -3,7 +3,7 @@ export type MemberStatus = 'ACTIVE' | 'INACTIVE';
 export type Gender = 'MALE' | 'FEMALE' | 'OTHER';
 export type MaritalStatus = 'SINGLE' | 'MARRIED' | 'WIDOWED' | 'DIVORCED';
 
-export type UserRole = 'ADMIN' | 'CELL_LEADER' | 'MEDIA_TEAM' | 'FINANCE';
+export type UserRole = 'ADMIN' | 'CELL_LEADER' | 'MEDIA_TEAM' | 'FINANCE' | 'DEVELOPER';
 
 export interface AuthUser {
   id: string;

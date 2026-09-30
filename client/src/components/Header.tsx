@@ -21,9 +21,13 @@ import {
   Building,
   Shield,
   LogOut,
-  User
+  User,
+  Terminal,
+  Eye,
+  ChevronDown,
+  Check
 } from 'lucide-react';
-import { ServiceSession, AuthUser, ChurchGroup } from '../types/index.ts';
+import { ServiceSession, AuthUser, ChurchGroup, UserRole } from '../types/index.ts';
 
 interface HeaderProps {
   activeTab:
@@ -51,6 +55,10 @@ interface HeaderProps {
   todayCelebrantsCount?: number;
   currentUser?: AuthUser | null;
   onLogout?: () => void;
+  isDeveloper?: boolean;
+  developerPreviewRole?: UserRole | null;
+  developerPreviewCell?: ChurchGroup | null;
+  onSetDeveloperPreview?: (role: UserRole | null, cell: ChurchGroup | null) => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -67,10 +75,15 @@ export const Header: React.FC<HeaderProps> = ({
   isSyncing,
   todayCelebrantsCount,
   currentUser,
-  onLogout
+  onLogout,
+  isDeveloper,
+  developerPreviewRole,
+  developerPreviewCell,
+  onSetDeveloperPreview
 }) => {
   const [showSessionModal, setShowSessionModal] = useState(false);
   const [showHotkeysModal, setShowHotkeysModal] = useState(false);
+  const [showRoleSwitcher, setShowRoleSwitcher] = useState(false);
   const [newServiceDate, setNewServiceDate] = useState(new Date().toISOString().split('T')[0]);
   const [newServiceType, setNewServiceType] = useState('Sunday Divine Worship Service');
   const [newTheme, setNewTheme] = useState('');
@@ -104,17 +117,19 @@ export const Header: React.FC<HeaderProps> = ({
 
   const isRoleAuthorizedForTab = (tab: string) => {
     if (!currentUser) return true;
-    if (currentUser.role === 'ADMIN') return true;
+    const effectiveRole = isDeveloper && developerPreviewRole ? developerPreviewRole : currentUser.role;
 
-    if (currentUser.role === 'CELL_LEADER') {
+    if (effectiveRole === 'ADMIN' || effectiveRole === 'DEVELOPER') return true;
+
+    if (effectiveRole === 'CELL_LEADER') {
       return ['checkin', 'members', 'attendance-history', 'pipeline'].includes(tab);
     }
 
-    if (currentUser.role === 'MEDIA_TEAM') {
+    if (effectiveRole === 'MEDIA_TEAM') {
       return ['checkin', 'members', 'attendance-history', 'celebrations', 'messaging'].includes(tab);
     }
 
-    if (currentUser.role === 'FINANCE') {
+    if (effectiveRole === 'FINANCE') {
       return ['finances', 'campaigns'].includes(tab);
     }
 
@@ -139,6 +154,12 @@ export const Header: React.FC<HeaderProps> = ({
               {currentUser?.cell && (
                 <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-900/60 text-blue-300 border border-blue-500/30">
                   {getCellLabel(currentUser.cell)}
+                </span>
+              )}
+              {isDeveloper && (
+                <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-300 border border-purple-500/50 flex items-center space-x-1">
+                  <Terminal className="w-3 h-3" />
+                  <span>DEV MODE</span>
                 </span>
               )}
             </div>
@@ -176,7 +197,7 @@ export const Header: React.FC<HeaderProps> = ({
             </select>
           </div>
 
-          {(currentUser?.role === 'ADMIN' || currentUser?.role === 'MEDIA_TEAM') && (
+          {(currentUser?.role === 'ADMIN' || currentUser?.role === 'MEDIA_TEAM' || isDeveloper) && (
             <button
               onClick={() => setShowSessionModal(true)}
               title="Create/Add New Service Session"
@@ -189,6 +210,120 @@ export const Header: React.FC<HeaderProps> = ({
 
         {/* Right Side: User Profile, Hotkeys & Offline Status */}
         <div className="flex items-center space-x-2.5">
+          {/* Developer Role Switcher Dropdown */}
+          {isDeveloper && onSetDeveloperPreview && (
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setShowRoleSwitcher((prev) => !prev)}
+                className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-xl text-xs font-extrabold border transition shadow-sm cursor-pointer ${
+                  developerPreviewRole
+                    ? 'bg-amber-500 text-slate-950 border-amber-400 animate-pulse'
+                    : 'bg-purple-900/60 hover:bg-purple-800/80 text-purple-200 border-purple-500/50'
+                }`}
+                title="Switch persona view for testing & troubleshooting"
+              >
+                <Eye className="w-3.5 h-3.5" />
+                <span>
+                  {developerPreviewRole ? `View: ${developerPreviewRole.replace('_', ' ')}` : 'Switch Persona View'}
+                </span>
+                <ChevronDown className="w-3.5 h-3.5" />
+              </button>
+
+              {showRoleSwitcher && (
+                <div className="absolute right-0 mt-2 w-64 bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl p-2 z-50 space-y-1 animate-in fade-in zoom-in-95">
+                  <div className="px-3 py-1.5 text-[10px] uppercase font-bold text-slate-400 border-b border-slate-800 flex items-center justify-between">
+                    <span>Developer Impersonation</span>
+                    <Terminal className="w-3 h-3 text-purple-400" />
+                  </div>
+
+                  <button
+                    onClick={() => {
+                      onSetDeveloperPreview(null, null);
+                      setShowRoleSwitcher(false);
+                    }}
+                    className={`w-full text-left px-3 py-2 rounded-xl text-xs font-bold transition flex items-center justify-between ${
+                      !developerPreviewRole
+                        ? 'bg-purple-600 text-white'
+                        : 'text-slate-300 hover:bg-slate-800 hover:text-white'
+                    }`}
+                  >
+                    <span>⚡ Full Developer Access</span>
+                    {!developerPreviewRole && <Check className="w-3.5 h-3.5" />}
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      onSetDeveloperPreview('ADMIN', null);
+                      setShowRoleSwitcher(false);
+                    }}
+                    className={`w-full text-left px-3 py-2 rounded-xl text-xs font-bold transition flex items-center justify-between ${
+                      developerPreviewRole === 'ADMIN'
+                        ? 'bg-blue-600 text-white'
+                        : 'text-slate-300 hover:bg-slate-800 hover:text-white'
+                    }`}
+                  >
+                    <span>👑 View as Administrator</span>
+                    {developerPreviewRole === 'ADMIN' && <Check className="w-3.5 h-3.5" />}
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      onSetDeveloperPreview('FINANCE', null);
+                      setShowRoleSwitcher(false);
+                    }}
+                    className={`w-full text-left px-3 py-2 rounded-xl text-xs font-bold transition flex items-center justify-between ${
+                      developerPreviewRole === 'FINANCE'
+                        ? 'bg-emerald-600 text-white'
+                        : 'text-slate-300 hover:bg-slate-800 hover:text-white'
+                    }`}
+                  >
+                    <span>💰 View as Finance Team</span>
+                    {developerPreviewRole === 'FINANCE' && <Check className="w-3.5 h-3.5" />}
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      onSetDeveloperPreview('MEDIA_TEAM', null);
+                      setShowRoleSwitcher(false);
+                    }}
+                    className={`w-full text-left px-3 py-2 rounded-xl text-xs font-bold transition flex items-center justify-between ${
+                      developerPreviewRole === 'MEDIA_TEAM'
+                        ? 'bg-rose-600 text-white'
+                        : 'text-slate-300 hover:bg-slate-800 hover:text-white'
+                    }`}
+                  >
+                    <span>📹 View as Media Team</span>
+                    {developerPreviewRole === 'MEDIA_TEAM' && <Check className="w-3.5 h-3.5" />}
+                  </button>
+
+                  <div className="pt-1 border-t border-slate-800">
+                    <span className="px-3 text-[10px] text-slate-500 font-bold block mb-1">Cell Leaders:</span>
+                    {(['JOY', 'FAITH', 'HOPE', 'LOVE'] as const).map((c) => (
+                      <button
+                        key={c}
+                        onClick={() => {
+                          onSetDeveloperPreview('CELL_LEADER', c);
+                          setShowRoleSwitcher(false);
+                        }}
+                        className={`w-full text-left px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center justify-between ${
+                          developerPreviewRole === 'CELL_LEADER' && developerPreviewCell === c
+                            ? 'bg-amber-600 text-white'
+                            : 'text-slate-300 hover:bg-slate-800 hover:text-white'
+                        }`}
+                      >
+                        <span>❤️ {c} Cell Leader</span>
+                        {developerPreviewRole === 'CELL_LEADER' && developerPreviewCell === c && (
+                          <Check className="w-3.5 h-3.5" />
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
           {/* User badge & Logout */}
           {currentUser && (
             <div className="flex items-center space-x-2 bg-slate-850 px-2.5 py-1 rounded-xl border border-slate-700/80">
@@ -197,7 +332,7 @@ export const Header: React.FC<HeaderProps> = ({
                   <span>{currentUser.username}</span>
                 </div>
                 <div className="text-[9px] font-bold text-amber-400 uppercase tracking-wider">
-                  {currentUser.role.replace('_', ' ')}
+                  {developerPreviewRole ? `Preview: ${developerPreviewRole}` : currentUser.role.replace('_', ' ')}
                 </div>
               </div>
 
