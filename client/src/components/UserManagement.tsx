@@ -119,6 +119,8 @@ export const UserManagement: React.FC = () => {
         return 'bg-purple-500/20 text-purple-300 border-purple-500/40';
       case 'FINANCE':
         return 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40';
+      case 'DEVELOPER':
+        return 'bg-amber-500/20 text-amber-300 border-amber-500/40';
       default:
         return 'bg-slate-700 text-slate-300 border-slate-600';
     }
@@ -163,7 +165,7 @@ export const UserManagement: React.FC = () => {
             <h2 className="text-xl font-extrabold tracking-tight">System Role Management</h2>
           </div>
           <p className="text-xs text-slate-400 mt-1">
-            {currentUser?.role === 'ADMIN'
+            {currentUser?.role === 'ADMIN' || currentUser?.role === 'DEVELOPER'
               ? 'Admins can manage all leadership accounts, assigned cells, and permission levels.'
               : `Managing leadership accounts for ${getCellLabel(currentUser?.cell)}.`}
           </p>
@@ -398,10 +400,10 @@ export const UserManagement: React.FC = () => {
                   disabled={currentUser?.role === 'CELL_LEADER'}
                   className="w-full bg-slate-950 border border-slate-700 rounded-2xl px-4 py-2.5 text-sm text-white focus:ring-2 focus:ring-blue-500 focus:outline-none cursor-pointer"
                 >
-                  {currentUser?.role === 'ADMIN' && <option value="ADMIN">Admin (Full Control)</option>}
+                  {(currentUser?.role === 'ADMIN' || currentUser?.role === 'DEVELOPER') && <option value="ADMIN">Admin (Full Control)</option>}
                   <option value="CELL_LEADER">Cell Leader (Joy, Faith, Hope, or Love)</option>
-                  {currentUser?.role === 'ADMIN' && <option value="MEDIA_TEAM">Media Team (Attendance & Messages)</option>}
-                  {currentUser?.role === 'ADMIN' && <option value="FINANCE">Finance (Tithes & Pledges)</option>}
+                  {(currentUser?.role === 'ADMIN' || currentUser?.role === 'DEVELOPER') && <option value="MEDIA_TEAM">Media Team (Attendance & Messages)</option>}
+                  {(currentUser?.role === 'ADMIN' || currentUser?.role === 'DEVELOPER') && <option value="FINANCE">Finance (Tithes & Pledges)</option>}
                 </select>
               </div>
 
