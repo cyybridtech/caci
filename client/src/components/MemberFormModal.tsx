@@ -13,6 +13,24 @@ interface MemberFormModalProps {
   onSubmit: (memberData: any) => Promise<void>;
 }
 
+const formatDateForInput = (val?: string | Date | null): string => {
+  if (!val) return '';
+  try {
+    const s = String(val).trim();
+    if (/^\d{4}-\d{2}-\d{2}/.test(s)) {
+      return s.substring(0, 10);
+    }
+    const d = new Date(val);
+    if (isNaN(d.getTime())) return '';
+    const y = d.getUTCFullYear();
+    const m = String(d.getUTCMonth() + 1).padStart(2, '0');
+    const day = String(d.getUTCDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  } catch {
+    return '';
+  }
+};
+
 export const MemberFormModal: React.FC<MemberFormModalProps> = ({
   isOpen,
   mode,
@@ -75,8 +93,8 @@ export const MemberFormModal: React.FC<MemberFormModalProps> = ({
       setChurchGroup(initialMember.churchGroup || assignedCell || 'JOY');
       setRole(initialMember.role || 'Member');
       setStatus(initialMember.status || 'ACTIVE');
-      setDateOfBirth(initialMember.dateOfBirth ? new Date(initialMember.dateOfBirth).toISOString().split('T')[0] : '');
-      setWeddingAnniversary(initialMember.weddingAnniversary ? new Date(initialMember.weddingAnniversary).toISOString().split('T')[0] : '');
+      setDateOfBirth(formatDateForInput(initialMember.dateOfBirth));
+      setWeddingAnniversary(formatDateForInput(initialMember.weddingAnniversary));
       setHometown(initialMember.hometown || '');
       setAddress(initialMember.address || '');
       setOccupation(initialMember.occupation || '');
@@ -436,9 +454,21 @@ export const MemberFormModal: React.FC<MemberFormModalProps> = ({
           {/* Dates & Demographics */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">Date of Birth</label>
+              <div className="flex items-center justify-between mb-1">
+                <label className="block text-xs font-bold text-slate-700">Date of Birth</label>
+                {dateOfBirth && (
+                  <button
+                    type="button"
+                    onClick={() => setDateOfBirth('')}
+                    className="text-[10px] text-rose-500 hover:text-rose-700 font-semibold cursor-pointer"
+                  >
+                    Clear
+                  </button>
+                )}
+              </div>
               <input
                 type="date"
+                max={new Date().toISOString().split('T')[0]}
                 value={dateOfBirth}
                 onChange={(e) => setDateOfBirth(e.target.value)}
                 className="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs font-medium focus:ring-2 focus:ring-blue-500 focus:outline-none"
@@ -446,11 +476,28 @@ export const MemberFormModal: React.FC<MemberFormModalProps> = ({
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">Wedding Anniv.</label>
+              <div className="flex items-center justify-between mb-1">
+                <label className="block text-xs font-bold text-slate-700">Wedding Anniv.</label>
+                {weddingAnniversary && (
+                  <button
+                    type="button"
+                    onClick={() => setWeddingAnniversary('')}
+                    className="text-[10px] text-rose-500 hover:text-rose-700 font-semibold cursor-pointer"
+                  >
+                    Clear
+                  </button>
+                )}
+              </div>
               <input
                 type="date"
+                max={new Date().toISOString().split('T')[0]}
                 value={weddingAnniversary}
-                onChange={(e) => setWeddingAnniversary(e.target.value)}
+                onChange={(e) => {
+                  setWeddingAnniversary(e.target.value);
+                  if (e.target.value && maritalStatus === 'SINGLE') {
+                    setMaritalStatus('MARRIED');
+                  }
+                }}
                 className="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs font-medium focus:ring-2 focus:ring-blue-500 focus:outline-none"
               />
             </div>

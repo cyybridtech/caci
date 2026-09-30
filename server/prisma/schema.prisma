@@ -56,6 +56,7 @@ enum FinancialCategory {
   THANKSGIVING
   BUILDING_PROJECT
   SPECIAL_SEED
+  EXPENSE
 }
 
 enum PaymentMethod {

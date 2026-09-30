@@ -180,6 +180,21 @@ memberRouter.get('/', async (req: Request, res: Response) => {
   }
 });
 
+function parseDatePayload(val: any): Date | null | undefined {
+  if (val === undefined) return undefined;
+  if (val === null || val === '' || val === 'null' || val === 'undefined') return null;
+  if (typeof val === 'string') {
+    const trimmed = val.trim();
+    if (!trimmed) return null;
+    if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) {
+      const [y, m, d] = trimmed.split('-').map(Number);
+      return new Date(Date.UTC(y, m - 1, d, 12, 0, 0));
+    }
+  }
+  const parsed = new Date(val);
+  return isNaN(parsed.getTime()) ? null : parsed;
+}
+
 // GET /api/members/:id - full member details including contributions and pledges
 memberRouter.get('/:id', async (req: Request, res: Response) => {
   try {
@@ -223,8 +238,8 @@ memberRouter.get('/:id', async (req: Request, res: Response) => {
       return res.status(403).json({ error: 'You can only view members from your assigned cell' });
     }
 
-    // Cell leaders cannot see member finances (pledges, tithes, welfare, offerings)
-    if (currentUser.role === UserRole.CELL_LEADER) {
+    // Cell leaders and Media Team cannot see member finances (pledges, tithes, welfare, offerings)
+    if (currentUser.role === UserRole.CELL_LEADER || currentUser.role === UserRole.MEDIA_TEAM) {
       (member as any).contributions = [];
       (member as any).pledges = [];
     }
@@ -307,8 +322,8 @@ memberRouter.post('/', async (req: Request, res: Response) => {
         churchGroup: targetCell,
         role: role || 'Member',
         status: status === 'INACTIVE' ? MemberStatus.INACTIVE : MemberStatus.ACTIVE,
-        dateOfBirth: dateOfBirth ? new Date(dateOfBirth) : null,
-        weddingAnniversary: weddingAnniversary ? new Date(weddingAnniversary) : null,
+        dateOfBirth: parseDatePayload(dateOfBirth) || null,
+        weddingAnniversary: parseDatePayload(weddingAnniversary) || null,
         hometown: hometown ? hometown.trim() : null,
         address: address ? address.trim() : null,
         occupation: occupation ? occupation.trim() : null,
@@ -400,8 +415,8 @@ memberRouter.put('/:id', async (req: Request, res: Response) => {
         churchGroup: targetCell,
         role: role || undefined,
         status: status ? (status === 'INACTIVE' ? MemberStatus.INACTIVE : MemberStatus.ACTIVE) : undefined,
-        dateOfBirth: dateOfBirth ? new Date(dateOfBirth) : undefined,
-        weddingAnniversary: weddingAnniversary ? new Date(weddingAnniversary) : undefined,
+        dateOfBirth: parseDatePayload(dateOfBirth),
+        weddingAnniversary: parseDatePayload(weddingAnniversary),
         hometown: hometown !== undefined ? (hometown ? hometown.trim() : null) : undefined,
         address: address !== undefined ? (address ? address.trim() : null) : undefined,
         occupation: occupation !== undefined ? (occupation ? occupation.trim() : null) : undefined,

@@ -52,8 +52,12 @@ export async function getCelebrantsForDate(targetDate = new Date()): Promise<Cel
     // 1. Birthday Check
     if (m.dateOfBirth) {
       const dob = new Date(m.dateOfBirth);
-      if (dob.getMonth() === targetMonth && dob.getDate() === targetDay) {
-        const age = targetDate.getFullYear() - dob.getFullYear();
+      const isDobMatch =
+        (dob.getUTCMonth() === targetMonth && dob.getUTCDate() === targetDay) ||
+        (dob.getMonth() === targetMonth && dob.getDate() === targetDay);
+      if (isDobMatch) {
+        const birthYear = dob.getUTCFullYear() || dob.getFullYear();
+        const age = targetDate.getFullYear() - birthYear;
         celebrants.push({
           memberId: m.id,
           firstName: m.firstName,
@@ -72,8 +76,12 @@ export async function getCelebrantsForDate(targetDate = new Date()): Promise<Cel
     // 2. Wedding Anniversary Check
     if (m.weddingAnniversary) {
       const anniv = new Date(m.weddingAnniversary);
-      if (anniv.getMonth() === targetMonth && anniv.getDate() === targetDay) {
-        const years = targetDate.getFullYear() - anniv.getFullYear();
+      const isAnnivMatch =
+        (anniv.getUTCMonth() === targetMonth && anniv.getUTCDate() === targetDay) ||
+        (anniv.getMonth() === targetMonth && anniv.getDate() === targetDay);
+      if (isAnnivMatch) {
+        const annivYear = anniv.getUTCFullYear() || anniv.getFullYear();
+        const years = targetDate.getFullYear() - annivYear;
         celebrants.push({
           memberId: m.id,
           firstName: m.firstName,

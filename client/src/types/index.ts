@@ -28,7 +28,8 @@ export type FinancialCategory =
   | 'WELFARE'
   | 'THANKSGIVING'
   | 'BUILDING_PROJECT'
-  | 'SPECIAL_SEED';
+  | 'SPECIAL_SEED'
+  | 'EXPENSE';
 
 export type PaymentMethod = 'CASH' | 'MOBILE_MONEY' | 'BANK_TRANSFER' | 'CHEQUE';
 export type MessageChannel = 'SMS' | 'WHATSAPP';

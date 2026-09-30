@@ -32,6 +32,33 @@ interface MemberProfileModalProps {
   onDelete?: (id: string) => Promise<void> | void;
 }
 
+const formatDisplayDate = (d?: string | Date | null): string => {
+  if (!d) return 'Not recorded';
+  try {
+    const s = String(d).trim();
+    if (/^\d{4}-\d{2}-\d{2}/.test(s)) {
+      const [y, m, day] = s.substring(0, 10).split('-').map(Number);
+      const dateObj = new Date(Date.UTC(y, m - 1, day, 12, 0, 0));
+      return dateObj.toLocaleDateString('en-US', {
+        timeZone: 'UTC',
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric'
+      });
+    }
+    const dateObj = new Date(d);
+    if (isNaN(dateObj.getTime())) return 'Not recorded';
+    return dateObj.toLocaleDateString('en-US', {
+      timeZone: 'UTC',
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric'
+    });
+  } catch {
+    return 'Not recorded';
+  }
+};
+
 export const MemberProfileModal: React.FC<MemberProfileModalProps> = ({
   member: initialMember,
   onClose,
@@ -40,9 +67,17 @@ export const MemberProfileModal: React.FC<MemberProfileModalProps> = ({
 }) => {
   const { user } = useAuth();
   const isCellLeader = user?.role === 'CELL_LEADER';
+  const canViewFinances = user?.role === 'ADMIN' || user?.role === 'FINANCE';
   const [activeTab, setActiveTab] = useState<'profile' | 'tithes' | 'welfare' | 'pledges' | 'attendance' | 'allGiving'>('profile');
   const [fullMember, setFullMember] = useState<Member>(initialMember);
   const [isLoading, setIsLoading] = useState(true);
+
+  // If user lacks finance access, ensure they stay on profile tab
+  useEffect(() => {
+    if (!canViewFinances && ['tithes', 'welfare', 'pledges', 'allGiving'].includes(activeTab)) {
+      setActiveTab('profile');
+    }
+  }, [canViewFinances, activeTab]);
 
   useEffect(() => {
     let isMounted = true;
@@ -168,7 +203,7 @@ export const MemberProfileModal: React.FC<MemberProfileModalProps> = ({
 
           {/* Quick Metrics Bar */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-6 pt-4 border-t border-slate-800/80 text-xs">
-            {!isCellLeader && (
+            {canViewFinances && (
               <>
                 <div className="bg-slate-950/60 p-3 rounded-2xl border border-slate-800">
                   <span className="text-slate-400 font-semibold block">Total Tithes</span>
@@ -190,7 +225,7 @@ export const MemberProfileModal: React.FC<MemberProfileModalProps> = ({
                 </div>
               </>
             )}
-            <div className={`bg-slate-950/60 p-3 rounded-2xl border border-slate-800 ${isCellLeader ? 'col-span-2 sm:col-span-4' : ''}`}>
+            <div className={`bg-slate-950/60 p-3 rounded-2xl border border-slate-800 ${!canViewFinances ? 'col-span-2 sm:col-span-4' : ''}`}>
               <span className="text-slate-400 font-semibold block">Attendance</span>
               <span className="text-base font-black text-blue-400 mt-0.5 block">
                 {fullMember._count?.attendance || 0} Service(s)
@@ -213,7 +248,7 @@ export const MemberProfileModal: React.FC<MemberProfileModalProps> = ({
             <span>Profile & Bio</span>
           </button>
 
-          {!isCellLeader && (
+          {canViewFinances && (
             <>
               <button
                 onClick={() => setActiveTab('tithes')}
@@ -301,17 +336,13 @@ export const MemberProfileModal: React.FC<MemberProfileModalProps> = ({
                 <div className="flex justify-between">
                   <span className="text-slate-400">Date of Birth:</span>
                   <span className="font-semibold text-white">
-                    {fullMember.dateOfBirth
-                      ? new Date(fullMember.dateOfBirth).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
-                      : 'Not recorded'}
+                    {formatDisplayDate(fullMember.dateOfBirth)}
                   </span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-slate-400">Wedding Anniversary:</span>
                   <span className="font-semibold text-white">
-                    {fullMember.weddingAnniversary
-                      ? new Date(fullMember.weddingAnniversary).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
-                      : 'N/A'}
+                    {formatDisplayDate(fullMember.weddingAnniversary)}
                   </span>
                 </div>
                 <div className="flex justify-between">
