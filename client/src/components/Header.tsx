@@ -82,11 +82,48 @@ export const Header: React.FC<HeaderProps> = ({
   onSetDeveloperPreview
 }) => {
   const [showSessionModal, setShowSessionModal] = useState(false);
+  const [showSessionDropdown, setShowSessionDropdown] = useState(false);
+  const [sessionSearchTerm, setSessionSearchTerm] = useState('');
   const [showHotkeysModal, setShowHotkeysModal] = useState(false);
   const [showRoleSwitcher, setShowRoleSwitcher] = useState(false);
   const [newServiceDate, setNewServiceDate] = useState(new Date().toISOString().split('T')[0]);
   const [newServiceType, setNewServiceType] = useState('Sunday Divine Worship Service');
   const [newTheme, setNewTheme] = useState('');
+
+  const isSessionToday = (dateStr?: string | Date) => {
+    if (!dateStr) return false;
+    const d = new Date(dateStr);
+    const now = new Date();
+    return (
+      d.getUTCFullYear() === now.getFullYear() &&
+      d.getUTCMonth() === now.getMonth() &&
+      d.getUTCDate() === now.getDate()
+    ) || (
+      d.getFullYear() === now.getFullYear() &&
+      d.getMonth() === now.getMonth() &&
+      d.getDate() === now.getDate()
+    );
+  };
+
+  const formatSessionDate = (dateStr?: string | Date) => {
+    if (!dateStr) return 'Select Service';
+    const d = new Date(dateStr);
+    return d.toLocaleDateString(undefined, {
+      weekday: 'short',
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric'
+    });
+  };
+
+  const filteredSessionsList = sessions.filter((s) => {
+    if (!sessionSearchTerm.trim()) return true;
+    const q = sessionSearchTerm.toLowerCase().trim();
+    const dateFormatted = new Date(s.serviceDate).toLocaleDateString().toLowerCase();
+    const type = (s.serviceType || '').toLowerCase();
+    const theme = (s.theme || '').toLowerCase();
+    return dateFormatted.includes(q) || type.includes(q) || theme.includes(q);
+  });
 
   const handleCreateSessionSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -167,44 +204,160 @@ export const Header: React.FC<HeaderProps> = ({
           </div>
         </div>
 
-        {/* Center: Service Date Picker & Session Switcher */}
-        <div className="flex items-center space-x-2 bg-slate-800/90 px-3 py-1.5 rounded-xl border border-slate-700 shadow-inner">
-          <Calendar className="w-4 h-4 text-blue-400" />
-          <div className="flex items-center space-x-2">
-            {/* Direct Date Picker */}
-            <input
-              type="date"
-              value={currentDateValue}
-              onChange={(e) => onSelectDate(e.target.value)}
-              title="Select Service Date"
-              className="bg-slate-700/80 hover:bg-slate-700 text-white text-xs font-semibold px-2 py-1 rounded border border-slate-600 focus:outline-none cursor-pointer"
-            />
-
-            {/* Session Type Dropdown */}
-            <select
-              className="bg-transparent text-white font-medium text-xs focus:outline-none cursor-pointer pr-2 max-w-[180px] truncate"
-              value={activeSession?.id || ''}
-              onChange={(e) => {
-                const s = sessions.find((sess) => sess.id === e.target.value);
-                if (s) onSelectSession(s);
-              }}
+        {/* Center: Unified Service Session Selector & Switcher (HCI Enhanced) */}
+        <div className="relative">
+          <div className="flex items-center bg-slate-800/90 hover:bg-slate-800 rounded-2xl border border-slate-700 shadow-inner p-1 transition">
+            <button
+              type="button"
+              onClick={() => setShowSessionDropdown((prev) => !prev)}
+              className="flex items-center space-x-2.5 px-3 py-1.5 rounded-xl hover:bg-slate-700/60 text-left transition cursor-pointer"
+              title="Click to switch or browse church services"
             >
-              {sessions.map((s) => (
-                <option key={s.id} value={s.id} className="bg-slate-800 text-white">
-                  {new Date(s.serviceDate).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}: {s.serviceType}
-                </option>
-              ))}
-            </select>
+              <div className="p-1.5 rounded-lg bg-blue-600/20 text-blue-400 border border-blue-500/30">
+                <Calendar className="w-4 h-4" />
+              </div>
+              <div className="max-w-[210px] sm:max-w-[280px]">
+                <div className="flex items-center space-x-1.5">
+                  <span className="text-xs font-black text-white truncate">
+                    {activeSession ? formatSessionDate(activeSession.serviceDate) : 'Select Service'}
+                  </span>
+                  {activeSession && isSessionToday(activeSession.serviceDate) && (
+                    <span className="px-1.5 py-0.2 rounded-full text-[9px] font-black bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 uppercase tracking-wider">
+                      Today
+                    </span>
+                  )}
+                </div>
+                <p className="text-[10px] text-slate-400 font-medium truncate">
+                  {activeSession?.serviceType || 'Click to choose or create service'}
+                  {activeSession?.theme ? ` • "${activeSession.theme}"` : ''}
+                </p>
+              </div>
+              <ChevronDown className={`w-3.5 h-3.5 text-slate-400 transition-transform ${showSessionDropdown ? 'rotate-180 text-white' : ''}`} />
+            </button>
+
+            {(currentUser?.role === 'ADMIN' || currentUser?.role === 'MEDIA_TEAM' || isDeveloper) && (
+              <button
+                type="button"
+                onClick={() => {
+                  setShowSessionDropdown(false);
+                  setShowSessionModal(true);
+                }}
+                title="Create New Service Session"
+                className="p-2 ml-1 rounded-xl bg-blue-600/30 hover:bg-blue-600 text-blue-300 hover:text-white border border-blue-500/30 transition cursor-pointer"
+              >
+                <Plus className="w-3.5 h-3.5" />
+              </button>
+            )}
           </div>
 
-          {(currentUser?.role === 'ADMIN' || currentUser?.role === 'MEDIA_TEAM' || isDeveloper) && (
-            <button
-              onClick={() => setShowSessionModal(true)}
-              title="Create/Add New Service Session"
-              className="p-1 hover:bg-slate-700 rounded-lg text-slate-300 hover:text-white transition"
-            >
-              <Plus className="w-3.5 h-3.5" />
-            </button>
+          {/* Session Dropdown Popover */}
+          {showSessionDropdown && (
+            <>
+              <div
+                className="fixed inset-0 z-40"
+                onClick={() => setShowSessionDropdown(false)}
+              />
+              <div className="absolute left-1/2 -translate-x-1/2 top-full mt-2 w-80 sm:w-96 bg-slate-900 border border-slate-700 rounded-3xl shadow-2xl p-3 z-50 animate-in fade-in zoom-in-95 duration-150 text-white">
+                {/* Search Bar in Dropdown */}
+                <div className="relative mb-2">
+                  <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-2.5" />
+                  <input
+                    type="text"
+                    placeholder="Search services by date, type, or theme..."
+                    value={sessionSearchTerm}
+                    onChange={(e) => setSessionSearchTerm(e.target.value)}
+                    className="w-full pl-8 pr-3 py-1.5 bg-slate-800 border border-slate-700 rounded-xl text-xs font-semibold text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+
+                {/* Session List */}
+                <div className="max-h-60 overflow-y-auto space-y-1 divide-y divide-slate-800/60 pr-1">
+                  {filteredSessionsList.length === 0 ? (
+                    <div className="py-6 text-center text-slate-400 text-xs font-semibold">
+                      No service session found
+                    </div>
+                  ) : (
+                    filteredSessionsList.map((s) => {
+                      const isSelected = activeSession?.id === s.id;
+                      const isToday = isSessionToday(s.serviceDate);
+                      return (
+                        <button
+                          key={s.id}
+                          type="button"
+                          onClick={() => {
+                            onSelectSession(s);
+                            setShowSessionDropdown(false);
+                          }}
+                          className={`w-full p-2.5 rounded-2xl text-left transition flex items-center justify-between group cursor-pointer ${
+                            isSelected
+                              ? 'bg-blue-600/25 border border-blue-500/40 text-white'
+                              : 'hover:bg-slate-800/80 text-slate-300 hover:text-white'
+                          }`}
+                        >
+                          <div className="min-w-0 pr-2">
+                            <div className="flex items-center space-x-1.5">
+                              <span className="text-xs font-bold text-white">
+                                {formatSessionDate(s.serviceDate)}
+                              </span>
+                              {isToday && (
+                                <span className="px-1.5 py-0.2 rounded-full text-[9px] font-black bg-emerald-500/30 text-emerald-300 border border-emerald-500/40">
+                                  TODAY
+                                </span>
+                              )}
+                              {s._count?.attendance !== undefined && (
+                                <span className="text-[10px] text-slate-400 font-mono">
+                                  • {s._count.attendance} present
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-[11px] font-medium text-slate-400 truncate mt-0.5">
+                              {s.serviceType}
+                              {s.theme ? ` — "${s.theme}"` : ''}
+                            </p>
+                          </div>
+
+                          {isSelected && (
+                            <div className="w-5 h-5 rounded-full bg-blue-500 text-white flex items-center justify-center shrink-0 shadow-sm">
+                              <Check className="w-3 h-3" />
+                            </div>
+                          )}
+                        </button>
+                      );
+                    })
+                  )}
+                </div>
+
+                {/* Bottom Actions */}
+                <div className="pt-2 mt-2 border-t border-slate-800 flex items-center justify-between gap-2">
+                  <div className="flex items-center space-x-1">
+                    <span className="text-[11px] text-slate-400 font-bold">Pick Date:</span>
+                    <input
+                      type="date"
+                      value={currentDateValue}
+                      onChange={(e) => {
+                        onSelectDate(e.target.value);
+                        setShowSessionDropdown(false);
+                      }}
+                      className="bg-slate-800 text-white text-[11px] font-bold px-2 py-1 rounded-xl border border-slate-700 focus:outline-none cursor-pointer hover:bg-slate-700"
+                    />
+                  </div>
+
+                  {(currentUser?.role === 'ADMIN' || currentUser?.role === 'MEDIA_TEAM' || isDeveloper) && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowSessionDropdown(false);
+                        setShowSessionModal(true);
+                      }}
+                      className="px-3 py-1 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-[11px] font-extrabold transition flex items-center space-x-1 cursor-pointer"
+                    >
+                      <Plus className="w-3 h-3" />
+                      <span>New Service</span>
+                    </button>
+                  )}
+                </div>
+              </div>
+            </>
           )}
         </div>
 
@@ -582,35 +735,92 @@ export const Header: React.FC<HeaderProps> = ({
 
             <form onSubmit={handleCreateSessionSubmit} className="space-y-4">
               <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1">Service Date</label>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="block text-xs font-semibold text-slate-300">Service Date</label>
+                  <div className="flex items-center space-x-1.5">
+                    <button
+                      type="button"
+                      onClick={() => setNewServiceDate(new Date().toISOString().split('T')[0])}
+                      className="text-[10px] px-2 py-0.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-blue-300 font-bold cursor-pointer"
+                    >
+                      Today
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const d = new Date();
+                        const day = d.getDay();
+                        const diff = (7 - day) % 7 || 7;
+                        d.setDate(d.getDate() + diff);
+                        setNewServiceDate(d.toISOString().split('T')[0]);
+                      }}
+                      className="text-[10px] px-2 py-0.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-blue-300 font-bold cursor-pointer"
+                    >
+                      Next Sun
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const d = new Date();
+                        const day = d.getDay();
+                        const diff = (3 - day + 7) % 7 || 7;
+                        d.setDate(d.getDate() + diff);
+                        setNewServiceDate(d.toISOString().split('T')[0]);
+                      }}
+                      className="text-[10px] px-2 py-0.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-blue-300 font-bold cursor-pointer"
+                    >
+                      Wed
+                    </button>
+                  </div>
+                </div>
                 <input
                   type="date"
                   required
                   value={newServiceDate}
                   onChange={(e) => setNewServiceDate(e.target.value)}
-                  className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-sm text-white focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                  className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-sm text-white focus:ring-2 focus:ring-blue-500 focus:outline-none font-semibold"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1">Service Type</label>
-                <select
+                <label className="block text-xs font-semibold text-slate-300 mb-1.5">Service Type Preset</label>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-2">
+                  {[
+                    { type: 'Sunday Divine Worship Service', label: '☀️ Sunday Divine Service' },
+                    { type: 'Midweek Teaching & Prayer Service', label: '🕊️ Midweek Teaching (Wed)' },
+                    { type: 'Friday Prayer Night', label: '🔥 Friday Prayer Night' },
+                    { type: 'All-Night Miracle Vigil', label: '🌟 All-Night Miracle Vigil' },
+                    { type: 'Special Convention & Harvest Service', label: '📖 Special Convention' }
+                  ].map((preset) => (
+                    <button
+                      key={preset.type}
+                      type="button"
+                      onClick={() => setNewServiceType(preset.type)}
+                      className={`p-2 rounded-xl text-xs font-bold text-left transition border cursor-pointer ${
+                        newServiceType === preset.type
+                          ? 'bg-blue-600 text-white border-blue-400 shadow-sm'
+                          : 'bg-slate-800/80 hover:bg-slate-800 text-slate-300 border-slate-700'
+                      }`}
+                    >
+                      {preset.label}
+                    </button>
+                  ))}
+                </div>
+                <input
+                  type="text"
+                  required
+                  placeholder="Or enter custom service type..."
                   value={newServiceType}
                   onChange={(e) => setNewServiceType(e.target.value)}
-                  className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-sm text-white focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                >
-                  <option value="Sunday Divine Worship Service">Sunday Divine Worship Service</option>
-                  <option value="Midweek Teaching & Prayer Service">Midweek Teaching & Prayer Service</option>
-                  <option value="Friday Prayer Night">Friday Prayer Night</option>
-                  <option value="Special Convention Service">Special Convention Service</option>
-                </select>
+                  className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:ring-2 focus:ring-blue-500 focus:outline-none font-medium"
+                />
               </div>
 
               <div>
                 <label className="block text-xs font-semibold text-slate-300 mb-1">Sermon Theme (Optional)</label>
                 <input
                   type="text"
-                  placeholder="e.g. Walking in Greater Grace"
+                  placeholder="e.g. Walking in Greater Grace & Victory"
                   value={newTheme}
                   onChange={(e) => setNewTheme(e.target.value)}
                   className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-sm text-white focus:ring-2 focus:ring-blue-500 focus:outline-none"
@@ -621,13 +831,13 @@ export const Header: React.FC<HeaderProps> = ({
                 <button
                   type="button"
                   onClick={() => setShowSessionModal(false)}
-                  className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium"
+                  className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold transition shadow-sm"
+                  className="px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold transition shadow-sm cursor-pointer"
                 >
                   Save & Set Active
                 </button>

@@ -174,10 +174,20 @@ export const App: React.FC = () => {
           api.getActiveSession().catch(() => null),
           api.getSessions().catch(() => [])
         ]);
+
+        const savedSessionId = localStorage.getItem('caci_selected_session_id');
+        let effectiveActive = fetchedSessions.find((s) => s.id === savedSessionId);
+        if (!effectiveActive) {
+          effectiveActive = fetchedActive || fetchedSessions[0] || null;
+        }
+        if (effectiveActive) {
+          localStorage.setItem('caci_selected_session_id', effectiveActive.id);
+        }
+
         setMembers(fetchedMembers);
         setContributions(fetchedFinances);
         setFinancialSummary(finSummary);
-        setActiveSession(fetchedActive);
+        setActiveSession(effectiveActive);
         setSessions(fetchedSessions);
         setAttendanceRecords([]);
         setStats(null);
@@ -194,17 +204,26 @@ export const App: React.FC = () => {
         api.getDepartments().catch(() => [])
       ]);
 
+      const savedSessionId = localStorage.getItem('caci_selected_session_id');
+      let effectiveActive = fetchedSessions.find((s) => s.id === savedSessionId);
+      if (!effectiveActive) {
+        effectiveActive = fetchedActive || fetchedSessions[0] || null;
+      }
+      if (effectiveActive) {
+        localStorage.setItem('caci_selected_session_id', effectiveActive.id);
+      }
+
       setSessions(fetchedSessions);
-      setActiveSession(fetchedActive);
+      setActiveSession(effectiveActive);
       setMembers(fetchedMembers);
       setDepartments(fetchedDepts);
 
-      if (fetchedActive) {
+      if (effectiveActive) {
         if (role === 'CELL_LEADER') {
           // Cell Leader only needs attendance records and stats
           const [attRecords, attStats] = await Promise.all([
-            api.getSessionAttendance(fetchedActive.id).catch(() => []),
-            api.getAttendanceStats(fetchedActive.id).catch(() => null)
+            api.getSessionAttendance(effectiveActive.id).catch(() => []),
+            api.getAttendanceStats(effectiveActive.id).catch(() => null)
           ]);
           setAttendanceRecords(attRecords);
           setStats(attStats);
@@ -215,8 +234,8 @@ export const App: React.FC = () => {
         } else {
           // Admin & Media Team
           const [attRecords, attStats, fetchedFinances, finSummary, msgs, celData] = await Promise.all([
-            api.getSessionAttendance(fetchedActive.id).catch(() => []),
-            api.getAttendanceStats(fetchedActive.id).catch(() => null),
+            api.getSessionAttendance(effectiveActive.id).catch(() => []),
+            api.getAttendanceStats(effectiveActive.id).catch(() => null),
             role === 'ADMIN' ? api.getFinances().catch(() => []) : Promise.resolve([]),
             role === 'ADMIN' ? api.getFinancialSummary().catch(() => null) : Promise.resolve(null),
             api.getMessageLogs().catch(() => []),
@@ -255,6 +274,7 @@ export const App: React.FC = () => {
   // Session selection handler
   const handleSelectSession = async (session: ServiceSession) => {
     setActiveSession(session);
+    localStorage.setItem('caci_selected_session_id', session.id);
     try {
       const [attRecords, attStats] = await Promise.all([
         api.getSessionAttendance(session.id),
@@ -262,6 +282,7 @@ export const App: React.FC = () => {
       ]);
       setAttendanceRecords(attRecords);
       setStats(attStats);
+      showToast(`Active: ${session.serviceType} (${new Date(session.serviceDate).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })})`);
     } catch (err) {
       console.error(err);
     }
@@ -287,6 +308,7 @@ export const App: React.FC = () => {
       });
 
       setActiveSession(session);
+      localStorage.setItem('caci_selected_session_id', session.id);
 
       const [attRecords, attStats] = await Promise.all([
         api.getSessionAttendance(session.id),
@@ -294,7 +316,7 @@ export const App: React.FC = () => {
       ]);
       setAttendanceRecords(attRecords);
       setStats(attStats);
-      showToast(`Switched to service date: ${new Date(session.serviceDate).toLocaleDateString()}`);
+      showToast(`Switched to: ${session.serviceType} (${new Date(session.serviceDate).toLocaleDateString()})`);
     } catch (err: any) {
       console.error('Error switching date:', err);
     }
@@ -304,8 +326,9 @@ export const App: React.FC = () => {
   const handleCreateSession = async (data: { serviceDate?: string; serviceType: string; theme?: string }) => {
     try {
       const newSession = await api.createSession(data);
-      setSessions((prev) => [newSession, ...prev]);
+      setSessions((prev) => [newSession, ...prev.filter((s) => s.id !== newSession.id)]);
       setActiveSession(newSession);
+      localStorage.setItem('caci_selected_session_id', newSession.id);
       setAttendanceRecords([]);
       setStats({
         totalMembers: members.length,
@@ -319,7 +342,7 @@ export const App: React.FC = () => {
           LOVE: { total: members.filter(m => m.churchGroup === 'LOVE').length, present: 0, absent: members.filter(m => m.churchGroup === 'LOVE').length, percentage: 0 },
         }
       });
-      showToast(`Created service session: ${newSession.serviceType}`);
+      showToast(`Created & selected: ${newSession.serviceType}`);
     } catch (err: any) {
       alert(err.message || 'Failed to create session');
     }
@@ -333,9 +356,11 @@ export const App: React.FC = () => {
         const nextActive = remaining[0] || null;
         setActiveSession(nextActive);
         if (nextActive) {
+          localStorage.setItem('caci_selected_session_id', nextActive.id);
           api.getSessionAttendance(nextActive.id).then(setAttendanceRecords).catch(() => setAttendanceRecords([]));
           api.getAttendanceStats(nextActive.id).then(setStats).catch(() => setStats(null));
         } else {
+          localStorage.removeItem('caci_selected_session_id');
           setAttendanceRecords([]);
           setStats(null);
         }

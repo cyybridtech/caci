@@ -7,34 +7,71 @@ export const sessionRouter = Router();
 
 sessionRouter.use(requireAuth);
 
-// GET /api/sessions/active - get latest or today's active session
+// GET /api/sessions/active - get today's active session or the most recent service session
 sessionRouter.get('/active', async (req: Request, res: Response) => {
   try {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    const now = new Date();
+    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0);
+    const todayEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
 
+    // 1. Try finding a session specifically scheduled for today
     let session = await prisma.serviceSession.findFirst({
       where: {
         serviceDate: {
-          gte: today
+          gte: todayStart,
+          lte: todayEnd
         }
       },
-      orderBy: { serviceDate: 'desc' }
+      include: {
+        _count: {
+          select: { attendance: true, contributions: true }
+        }
+      },
+      orderBy: { createdAt: 'desc' }
     });
 
+    // 2. If no session today, find the most recent past/current session on or before today
     if (!session) {
       session = await prisma.serviceSession.findFirst({
+        where: {
+          serviceDate: {
+            lte: todayEnd
+          }
+        },
+        include: {
+          _count: {
+            select: { attendance: true, contributions: true }
+          }
+        },
         orderBy: { serviceDate: 'desc' }
       });
     }
 
+    // 3. If still none (e.g. only future sessions exist), find the closest upcoming session or latest created
+    if (!session) {
+      session = await prisma.serviceSession.findFirst({
+        include: {
+          _count: {
+            select: { attendance: true, contributions: true }
+          }
+        },
+        orderBy: { serviceDate: 'asc' }
+      });
+    }
+
+    // 4. Default auto-create for today if database has no sessions at all
     if (!session) {
       session = await prisma.serviceSession.create({
         data: {
           serviceDate: new Date(),
-          serviceType: 'Sunday Divine Service',
+          serviceType: 'Sunday Divine Worship Service',
           theme: 'Walking in Supernatural Victory',
           notes: 'Auto-created service session'
+        },
+        include: {
+          _count: {
+            select: { attendance: true, contributions: true }
+          }
         }
       });
     }
@@ -135,6 +172,11 @@ sessionRouter.post('/', async (req: Request, res: Response) => {
         serviceType,
         theme: theme || null,
         notes: notes || null
+      },
+      include: {
+        _count: {
+          select: { attendance: true, contributions: true }
+        }
       }
     });
 
@@ -146,7 +188,7 @@ sessionRouter.post('/', async (req: Request, res: Response) => {
 });
 
 // DELETE /api/sessions/:id - delete a service session and its cascade records
-sessionRouter.delete('/:id', requireRole(UserRole.ADMIN, UserRole.MEDIA_TEAM), async (req: Request, res: Response) => {
+sessionRouter.delete('/:id', requireRole(UserRole.ADMIN, UserRole.MEDIA_TEAM, UserRole.DEVELOPER), async (req: Request, res: Response) => {
   try {
     const id = req.params.id as string;
 

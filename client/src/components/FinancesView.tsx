@@ -112,6 +112,8 @@ export const FinancesView: React.FC<FinancesViewProps> = ({
   const [categoryFilter, setCategoryFilter] = useState<string>('ALL');
 
   const [memberId, setMemberId] = useState<string>('');
+  const [contributorType, setContributorType] = useState<'MEMBER' | 'GENERAL_OFFERING' | 'ANONYMOUS'>('MEMBER');
+  const [contributorSearchTerm, setContributorSearchTerm] = useState<string>('');
   const [category, setCategory] = useState<FinancialCategory>('TITHE');
   const [amount, setAmount] = useState<string>('');
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('CASH');
@@ -209,10 +211,39 @@ export const FinancesView: React.FC<FinancesViewProps> = ({
     });
   }, [members, memberCellFilter, memberSearchTerm]);
 
+  // Filtered members for contribution modal search
+  const searchedMembersForContribution = useMemo(() => {
+    if (!contributorSearchTerm.trim()) {
+      return members.slice(0, 8);
+    }
+    const q = contributorSearchTerm.toLowerCase().trim();
+    return members.filter(
+      (m) =>
+        `${m.firstName} ${m.lastName}`.toLowerCase().includes(q) ||
+        (m.phone || '').includes(q) ||
+        (m.memberCode || '').toLowerCase().includes(q) ||
+        (m.churchGroup || '').toLowerCase().includes(q)
+    ).slice(0, 12);
+  }, [members, contributorSearchTerm]);
+
+  const selectedContributionMember = useMemo(() => {
+    return members.find((m) => m.id === memberId) || null;
+  }, [members, memberId]);
+
   // Open contribution edit
   const openEditContribution = (c: FinancialContribution) => {
     setEditingContribution(c);
-    setMemberId(c.memberId || '');
+    if (c.memberId) {
+      setContributorType('MEMBER');
+      setMemberId(c.memberId);
+    } else if (c.category === 'OFFERING') {
+      setContributorType('GENERAL_OFFERING');
+      setMemberId('');
+    } else {
+      setContributorType('ANONYMOUS');
+      setMemberId('');
+    }
+    setContributorSearchTerm('');
     setCategory(c.category);
     setAmount(String(Number(c.amount)));
     setPaymentMethod(c.paymentMethod);
@@ -225,6 +256,7 @@ export const FinancesView: React.FC<FinancesViewProps> = ({
   const openAddContributionForMember = (targetMemberId?: string) => {
     resetContributionForm();
     if (targetMemberId) {
+      setContributorType('MEMBER');
       setMemberId(targetMemberId);
     }
     setShowAddModal(true);
@@ -232,6 +264,8 @@ export const FinancesView: React.FC<FinancesViewProps> = ({
 
   const resetContributionForm = () => {
     setMemberId('');
+    setContributorType('MEMBER');
+    setContributorSearchTerm('');
     setCategory('TITHE');
     setAmount('');
     setPaymentMethod('CASH');
@@ -270,14 +304,22 @@ export const FinancesView: React.FC<FinancesViewProps> = ({
       return;
     }
 
+    const finalMemberId = contributorType === 'MEMBER' && memberId ? memberId : null;
+    let finalNotes = notes.trim() || null;
+    if (contributorType === 'GENERAL_OFFERING' && !finalNotes) {
+      finalNotes = 'General Congregation Offering';
+    } else if (contributorType === 'ANONYMOUS' && !finalNotes) {
+      finalNotes = 'Anonymous Giver';
+    }
+
     const data = {
-      memberId: memberId || null,
+      memberId: finalMemberId,
       sessionId: session?.id || null,
       category,
       amount: Number(amount),
       paymentMethod,
       transactionDate: transactionDate || new Date().toISOString(),
-      notes: notes.trim() || null
+      notes: finalNotes
     };
 
     try {
@@ -1162,15 +1204,179 @@ export const FinancesView: React.FC<FinancesViewProps> = ({
                   className="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs font-bold focus:ring-2 focus:ring-emerald-500 focus:outline-none" />
               </div>
 
+              {/* Contributor Type Selector */}
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">Contributor (Member)</label>
-                <select value={memberId} onChange={e => setMemberId(e.target.value)}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs font-semibold focus:ring-2 focus:ring-emerald-500 focus:outline-none">
-                  <option value="">General Offering / Anonymous</option>
-                  {members.map(m => (
-                    <option key={m.id} value={m.id}>{m.firstName} {m.lastName} ({m.churchGroup} Cell)</option>
-                  ))}
-                </select>
+                <label className="block text-xs font-bold text-slate-700 mb-1.5 uppercase tracking-wider">
+                  Contributor / Source *
+                </label>
+                <div className="grid grid-cols-3 gap-1.5 bg-slate-100 p-1.5 rounded-2xl">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setContributorType('MEMBER');
+                      setContributorSearchTerm('');
+                    }}
+                    className={`py-2 px-2 rounded-xl text-xs font-bold transition flex items-center justify-center space-x-1 cursor-pointer ${
+                      contributorType === 'MEMBER'
+                        ? 'bg-white text-slate-900 shadow-sm'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    <User className="w-3.5 h-3.5" />
+                    <span className="truncate">Named Member</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setContributorType('GENERAL_OFFERING');
+                      setMemberId('');
+                      setCategory('OFFERING');
+                    }}
+                    className={`py-2 px-2 rounded-xl text-xs font-bold transition flex items-center justify-center space-x-1 cursor-pointer ${
+                      contributorType === 'GENERAL_OFFERING'
+                        ? 'bg-amber-500 text-slate-950 shadow-sm font-extrabold'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    <DollarSign className="w-3.5 h-3.5" />
+                    <span className="truncate">General Offering</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setContributorType('ANONYMOUS');
+                      setMemberId('');
+                    }}
+                    className={`py-2 px-2 rounded-xl text-xs font-bold transition flex items-center justify-center space-x-1 cursor-pointer ${
+                      contributorType === 'ANONYMOUS'
+                        ? 'bg-purple-600 text-white shadow-sm font-extrabold'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    <Gift className="w-3.5 h-3.5" />
+                    <span className="truncate">Anonymous Giver</span>
+                  </button>
+                </div>
+
+                {/* Member Search & Selection Area when MEMBER is selected */}
+                {contributorType === 'MEMBER' && (
+                  <div className="mt-3 space-y-2">
+                    {selectedContributionMember ? (
+                      <div className="p-3 bg-blue-50 border border-blue-200 rounded-2xl flex items-center justify-between">
+                        <div className="flex items-center space-x-3">
+                          <div
+                            className={`w-9 h-9 rounded-xl flex items-center justify-center font-extrabold text-xs text-white shadow-sm ${
+                              selectedContributionMember.churchGroup === 'JOY'
+                                ? 'bg-amber-500'
+                                : selectedContributionMember.churchGroup === 'FAITH'
+                                ? 'bg-blue-600'
+                                : selectedContributionMember.churchGroup === 'HOPE'
+                                ? 'bg-emerald-600'
+                                : 'bg-rose-600'
+                            }`}
+                          >
+                            {selectedContributionMember.firstName[0]}
+                            {selectedContributionMember.lastName[0]}
+                          </div>
+                          <div>
+                            <span className="font-extrabold text-xs text-slate-900 block">
+                              {selectedContributionMember.firstName} {selectedContributionMember.lastName}
+                            </span>
+                            <span className="text-[10px] text-slate-500 font-medium">
+                              {selectedContributionMember.memberCode || 'CACI'} • {selectedContributionMember.churchGroup} Cell {selectedContributionMember.phone ? `• ${selectedContributionMember.phone}` : ''}
+                            </span>
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setMemberId('');
+                            setContributorSearchTerm('');
+                          }}
+                          className="px-2.5 py-1 rounded-lg bg-white border border-blue-200 text-blue-700 text-[11px] font-bold hover:bg-blue-100 transition cursor-pointer"
+                        >
+                          Change
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="space-y-1.5">
+                        <div className="relative">
+                          <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
+                          <input
+                            type="text"
+                            placeholder="Type to search member name, phone, or cell..."
+                            value={contributorSearchTerm}
+                            onChange={(e) => setContributorSearchTerm(e.target.value)}
+                            className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs font-semibold focus:ring-2 focus:ring-blue-500 focus:bg-white focus:outline-none"
+                          />
+                        </div>
+
+                        <div className="max-h-36 overflow-y-auto border border-slate-200 rounded-xl divide-y divide-slate-100 bg-white shadow-inner">
+                          {searchedMembersForContribution.length === 0 ? (
+                            <div className="p-3 text-center text-slate-400 text-xs font-medium">
+                              No members match "{contributorSearchTerm}"
+                            </div>
+                          ) : (
+                            searchedMembersForContribution.map((m) => (
+                              <div
+                                key={m.id}
+                                onClick={() => {
+                                  setMemberId(m.id);
+                                  setContributorSearchTerm('');
+                                }}
+                                className="p-2.5 hover:bg-blue-50/70 transition flex items-center justify-between cursor-pointer group"
+                              >
+                                <div className="flex items-center space-x-2.5">
+                                  <div
+                                    className={`w-7 h-7 rounded-lg flex items-center justify-center font-bold text-[10px] text-white ${
+                                      m.churchGroup === 'JOY'
+                                        ? 'bg-amber-500'
+                                        : m.churchGroup === 'FAITH'
+                                        ? 'bg-blue-600'
+                                        : m.churchGroup === 'HOPE'
+                                        ? 'bg-emerald-600'
+                                        : 'bg-rose-600'
+                                    }`}
+                                  >
+                                    {m.firstName[0]}
+                                    {m.lastName[0]}
+                                  </div>
+                                  <div>
+                                    <span className="font-bold text-xs text-slate-900 group-hover:text-blue-600 block">
+                                      {m.firstName} {m.lastName}
+                                    </span>
+                                    <span className="text-[10px] text-slate-400">
+                                      {m.churchGroup} Cell {m.phone ? `• ${m.phone}` : ''}
+                                    </span>
+                                  </div>
+                                </div>
+                                <span className="text-[10px] font-bold text-blue-600 group-hover:underline">
+                                  Select →
+                                </span>
+                              </div>
+                            ))
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {contributorType === 'GENERAL_OFFERING' && (
+                  <div className="mt-2 p-2.5 bg-amber-50 border border-amber-200 rounded-xl text-[11px] text-amber-900 font-medium flex items-center space-x-1.5">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                    <span>Recorded as general church offering / loose collection from the congregation.</span>
+                  </div>
+                )}
+
+                {contributorType === 'ANONYMOUS' && (
+                  <div className="mt-2 p-2.5 bg-purple-50 border border-purple-200 rounded-xl text-[11px] text-purple-900 font-medium flex items-center space-x-1.5">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-purple-600 shrink-0" />
+                    <span>Recorded as an anonymous / unnamed giver.</span>
+                  </div>
+                )}
               </div>
 
               <div>
