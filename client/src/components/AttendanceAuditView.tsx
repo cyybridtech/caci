@@ -393,7 +393,7 @@ export const AttendanceAuditView: React.FC<AttendanceAuditViewProps> = ({
                               <span className="text-[10px] font-mono font-bold text-slate-400 uppercase tracking-wider">
                                 {session.id.slice(0, 8)}
                               </span>
-                              {(user?.role === 'ADMIN' || user?.role === 'MEDIA_TEAM') && (
+                              {(user?.role === 'ADMIN' || user?.role === 'DEVELOPER' || user?.role === 'MEDIA_TEAM') && (
                                 <button
                                   type="button"
                                   onClick={(e) => {
@@ -477,7 +477,7 @@ export const AttendanceAuditView: React.FC<AttendanceAuditViewProps> = ({
                       <span>Export Attendance CSV</span>
                     </button>
 
-                    {(user?.role === 'ADMIN' || user?.role === 'MEDIA_TEAM') && (
+                    {(user?.role === 'ADMIN' || user?.role === 'DEVELOPER' || user?.role === 'MEDIA_TEAM') && (
                       <button
                         onClick={() => handleDeleteSession(selectedSession)}
                         className="flex items-center space-x-1.5 px-3.5 py-2 rounded-xl bg-rose-600/80 hover:bg-rose-600 text-white text-xs font-bold transition cursor-pointer border border-rose-500/40 shadow-sm"
@@ -650,7 +650,7 @@ export const AttendanceAuditView: React.FC<AttendanceAuditViewProps> = ({
                             <th className="px-4 py-3.5">Marked By</th>
                             <th className="px-4 py-3.5">Phone Number</th>
                             <th className="px-4 py-3.5 text-right">Profile</th>
-                            {(user?.role === 'ADMIN' || user?.role === 'MEDIA_TEAM' || user?.role === 'CELL_LEADER') && (
+                            {(user?.role === 'ADMIN' || user?.role === 'DEVELOPER' || user?.role === 'MEDIA_TEAM' || user?.role === 'CELL_LEADER') && (
                               <th className="px-4 py-3.5 text-center">Remove</th>
                             )}
                           </tr>
@@ -753,7 +753,7 @@ export const AttendanceAuditView: React.FC<AttendanceAuditViewProps> = ({
                                 </td>
 
                                 {/* Remove from Attendance */}
-                                {(user?.role === 'ADMIN' || user?.role === 'MEDIA_TEAM' || user?.role === 'CELL_LEADER') && (
+                                {(user?.role === 'ADMIN' || user?.role === 'DEVELOPER' || user?.role === 'MEDIA_TEAM' || user?.role === 'CELL_LEADER') && (
                                   <td className="px-4 py-3.5 text-center">
                                     <button
                                       type="button"

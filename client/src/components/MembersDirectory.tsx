@@ -35,7 +35,7 @@ export const MembersDirectory: React.FC<MembersDirectoryProps> = ({
   const { user } = useAuth();
   const isCellLeader = user?.role === 'CELL_LEADER';
   const assignedCell = isCellLeader ? user?.cell : null;
-  const canDelete = user?.role === 'ADMIN' || user?.role === 'CELL_LEADER' || user?.role === 'MEDIA_TEAM';
+  const canDelete = user?.role === 'ADMIN' || user?.role === 'DEVELOPER' || user?.role === 'CELL_LEADER' || user?.role === 'MEDIA_TEAM';
 
   const [searchTerm, setSearchTerm] = useState('');
   const [groupFilter, setGroupFilter] = useState<'ALL' | 'JOY' | 'FAITH' | 'HOPE' | 'LOVE'>(

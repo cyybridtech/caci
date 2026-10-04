@@ -30,6 +30,8 @@ interface MemberProfileModalProps {
   onClose: () => void;
   onEdit?: (member: Member) => void;
   onDelete?: (id: string) => Promise<void> | void;
+  allowEdit?: boolean;
+  allowDelete?: boolean;
 }
 
 const formatDisplayDate = (d?: string | Date | null): string => {
@@ -63,7 +65,9 @@ export const MemberProfileModal: React.FC<MemberProfileModalProps> = ({
   member: initialMember,
   onClose,
   onEdit,
-  onDelete
+  onDelete,
+  allowEdit = true,
+  allowDelete = true
 }) => {
   const { user } = useAuth();
   const isCellLeader = user?.role === 'CELL_LEADER';
@@ -646,7 +650,12 @@ export const MemberProfileModal: React.FC<MemberProfileModalProps> = ({
         {/* Footer Actions */}
         <div className="p-4 bg-slate-950 border-t border-slate-800 flex items-center justify-between space-x-3 shrink-0">
           <div>
-            {onDelete && (user?.role === 'ADMIN' || user?.role === 'CELL_LEADER' || user?.role === 'MEDIA_TEAM') && (
+            {allowDelete && onDelete && (
+              user?.role === 'ADMIN' ||
+              user?.role === 'DEVELOPER' ||
+              user?.role === 'CELL_LEADER' ||
+              user?.role === 'MEDIA_TEAM'
+            ) && (
               <button
                 onClick={() => {
                   if (
@@ -673,7 +682,7 @@ export const MemberProfileModal: React.FC<MemberProfileModalProps> = ({
             >
               Close
             </button>
-            {onEdit && (
+            {allowEdit && onEdit && (
               <button
                 onClick={() => {
                   onClose();

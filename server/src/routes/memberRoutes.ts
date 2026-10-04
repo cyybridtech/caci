@@ -339,6 +339,19 @@ memberRouter.post('/', async (req: Request, res: Response) => {
             department: { connect: { id: deptId } }
           }))
         } : undefined
+      },
+      include: {
+        departments: {
+          select: {
+            departmentId: true,
+            department: {
+              select: { id: true, name: true }
+            }
+          }
+        },
+        _count: {
+          select: { attendance: true, contributions: true, pledges: true }
+        }
       }
     });
 
@@ -398,7 +411,7 @@ memberRouter.put('/:id', async (req: Request, res: Response) => {
     } = req.body;
 
     let targetCell = undefined;
-    if ((currentUser.role === UserRole.ADMIN || currentUser.role === UserRole.MEDIA_TEAM) && churchGroup && ['JOY', 'FAITH', 'HOPE', 'LOVE'].includes(churchGroup)) {
+    if ((currentUser.role === UserRole.ADMIN || currentUser.role === UserRole.MEDIA_TEAM || currentUser.role === UserRole.DEVELOPER) && churchGroup && ['JOY', 'FAITH', 'HOPE', 'LOVE'].includes(churchGroup)) {
       targetCell = churchGroup as ChurchGroup;
     }
 
@@ -436,6 +449,9 @@ memberRouter.put('/:id', async (req: Request, res: Response) => {
               select: { id: true, name: true }
             }
           }
+        },
+        _count: {
+          select: { attendance: true, contributions: true, pledges: true }
         }
       }
     });
@@ -465,6 +481,9 @@ memberRouter.put('/:id', async (req: Request, res: Response) => {
               select: { id: true, name: true }
             }
           }
+        },
+        _count: {
+          select: { attendance: true, contributions: true, pledges: true }
         }
       }
     });
@@ -494,7 +513,7 @@ memberRouter.patch('/:id/assimilation', async (req: Request, res: Response) => {
       where: { id },
       data: {
         assimilationStage: assimilationStage || undefined,
-        churchGroup: (currentUser.role === UserRole.ADMIN && churchGroup && ['JOY', 'FAITH', 'HOPE', 'LOVE'].includes(churchGroup))
+        churchGroup: ((currentUser.role === UserRole.ADMIN || currentUser.role === UserRole.DEVELOPER) && churchGroup && ['JOY', 'FAITH', 'HOPE', 'LOVE'].includes(churchGroup))
           ? (churchGroup as ChurchGroup)
           : undefined,
       }

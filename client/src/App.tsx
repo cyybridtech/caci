@@ -113,6 +113,7 @@ export const App: React.FC = () => {
   // Modals
   const [inspectingHistoryMember, setInspectingHistoryMember] = useState<Member | null>(null);
   const [profileMember, setProfileMember] = useState<Member | null>(null);
+  const [profileContext, setProfileContext] = useState<'members' | 'audit'>('members');
   const [editingMember, setEditingMember] = useState<Member | null>(null);
   const [isAddMemberOpen, setIsAddMemberOpen] = useState(false);
 
@@ -698,7 +699,10 @@ export const App: React.FC = () => {
                 onAddMember={handleAddMember}
                 onUpdateMember={handleUpdateMember}
                 onDeleteMember={handleDeleteMember}
-                onInspectMemberProfile={(m) => setProfileMember(m)}
+                onInspectMemberProfile={(m) => {
+                  setProfileContext('members');
+                  setProfileMember(m);
+                }}
                 onInspectMemberHistory={(m) => setInspectingHistoryMember(m)}
               />
             )}
@@ -707,7 +711,10 @@ export const App: React.FC = () => {
               <AttendanceAuditView
                 members={members}
                 sessions={sessions}
-                onInspectMemberProfile={(m) => setProfileMember(m)}
+                onInspectMemberProfile={(m) => {
+                  setProfileContext('audit');
+                  setProfileMember(m);
+                }}
                 onInspectMemberHistory={(m) => setInspectingHistoryMember(m)}
                 onDeleteSession={handleDeleteSession}
               />
@@ -795,6 +802,8 @@ export const App: React.FC = () => {
         <MemberProfileModal
           member={profileMember}
           onClose={() => setProfileMember(null)}
+          allowEdit={profileContext === 'members'}
+          allowDelete={profileContext === 'members'}
           onEdit={(m) => {
             setProfileMember(null);
             setEditingMember(m);
