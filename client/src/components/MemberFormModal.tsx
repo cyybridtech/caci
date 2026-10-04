@@ -182,7 +182,9 @@ export const MemberFormModal: React.FC<MemberFormModalProps> = ({
         isWaterBaptized,
         isHolyGhostBaptized,
         notes: notes.trim() || null,
-        departmentIds: selectedDepartmentIds
+        departmentIds: selectedDepartmentIds,
+        // Auto-enter pipeline when role is First-Timer
+        assimilationStage: role === 'First-Timer' ? 'FIRST_VISIT' : undefined,
       };
 
       await onSubmit(payload);
@@ -396,6 +398,7 @@ export const MemberFormModal: React.FC<MemberFormModalProps> = ({
                 onChange={(e) => setRole(e.target.value)}
                 className="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs font-medium focus:ring-2 focus:ring-blue-500 focus:outline-none"
               >
+                <option value="First-Timer">First-Timer (Visitor)</option>
                 <option value="Member">Member</option>
                 <option value="Elder">Elder</option>
                 <option value="Deacon">Deacon</option>

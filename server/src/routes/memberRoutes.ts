@@ -505,26 +505,68 @@ memberRouter.patch('/:id/assimilation', async (req: Request, res: Response) => {
     const existing = await prisma.member.findUnique({ where: { id } });
     if (!existing) return res.status(404).json({ error: 'Member not found' });
 
-    if (currentUser.role === UserRole.CELL_LEADER && existing.churchGroup !== currentUser.cell) {
+    // Cell leaders can only operate on members of their own cell,
+    // OR on unassigned visitors they are advancing into their cell
+    if (
+      currentUser.role === UserRole.CELL_LEADER &&
+      existing.churchGroup !== null &&
+      existing.churchGroup !== currentUser.cell
+    ) {
       return res.status(403).json({ error: 'Access denied' });
     }
 
-    const updated = await prisma.member.update({
+    // Determine the new church group
+    const validCells = ['JOY', 'FAITH', 'HOPE', 'LOVE'];
+    let newChurchGroup: ChurchGroup | undefined = undefined;
+
+    if (churchGroup && validCells.includes(churchGroup)) {
+      if (
+        currentUser.role === UserRole.ADMIN ||
+        currentUser.role === UserRole.DEVELOPER ||
+        // Cell leaders may assign to their own cell only
+        (currentUser.role === UserRole.CELL_LEADER && churchGroup === currentUser.cell)
+      ) {
+        newChurchGroup = churchGroup as ChurchGroup;
+      }
+    }
+
+    // When fully integrated, auto-promote role from First-Timer → Member
+    const isIntegrated = assimilationStage === 'ASSIGNED_GROUP';
+    const rolePromotion = isIntegrated && existing.role === 'First-Timer' ? 'Member' : undefined;
+
+    await prisma.member.update({
       where: { id },
       data: {
         assimilationStage: assimilationStage || undefined,
-        churchGroup: ((currentUser.role === UserRole.ADMIN || currentUser.role === UserRole.DEVELOPER) && churchGroup && ['JOY', 'FAITH', 'HOPE', 'LOVE'].includes(churchGroup))
-          ? (churchGroup as ChurchGroup)
-          : undefined,
+        churchGroup: newChurchGroup,
+        ...(rolePromotion ? { role: rolePromotion } : {}),
       }
     });
 
-    res.json(updated);
+    // Return full member with departments and counts so UI card doesn't lose data
+    const fullMember = await prisma.member.findUnique({
+      where: { id },
+      include: {
+        departments: {
+          include: {
+            department: {
+              select: { id: true, name: true }
+            }
+          }
+        },
+        _count: {
+          select: { attendance: true, contributions: true, pledges: true }
+        }
+      }
+    });
+
+    res.json(fullMember);
   } catch (error: any) {
     console.error('Error updating assimilation:', error);
     res.status(500).json({ error: 'Failed to update assimilation stage' });
   }
 });
+
 
 // DELETE /api/members/:id
 memberRouter.delete('/:id', async (req: Request, res: Response) => {

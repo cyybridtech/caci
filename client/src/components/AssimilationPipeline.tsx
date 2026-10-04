@@ -117,8 +117,13 @@ export const AssimilationPipeline: React.FC<AssimilationPipelineProps> = ({
                 {/* Cards List */}
                 <div className="space-y-3">
                   {stageMembers.length === 0 ? (
-                    <div className="py-12 text-center text-slate-400 text-xs italic">
-                      No visitors in this stage
+                    <div className="py-12 text-center text-slate-400 text-xs italic space-y-1">
+                      <div>No visitors in this stage</div>
+                      {stage.key === 'FIRST_VISIT' && (
+                        <div className="text-[10px] text-slate-400 not-italic">
+                          Add a member with role <span className="font-bold text-amber-600">First-Timer</span> to begin the pipeline
+                        </div>
+                      )}
                     </div>
                   ) : (
                     stageMembers.map((member) => (
