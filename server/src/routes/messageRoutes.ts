@@ -8,6 +8,44 @@ export const messageRouter = Router();
 
 messageRouter.use(requireAuth);
 
+function interpolateMessage(
+  template: string,
+  data: {
+    firstName?: string;
+    lastName?: string;
+    fullName?: string;
+    churchGroup?: ChurchGroup | string;
+    cell?: string;
+  }
+): string {
+  const first = data.firstName || (data.fullName ? data.fullName.split(' ')[0] : 'Beloved');
+  const last = data.lastName || (data.fullName ? data.fullName.split(' ').slice(1).join(' ') : '');
+  const full = data.fullName || (data.firstName ? `${data.firstName} ${data.lastName || ''}`.trim() : 'Beloved');
+
+  const cellLabel = (grp?: ChurchGroup | string) => {
+    switch (grp) {
+      case 'JOY':
+      case ChurchGroup.JOY: return 'Joy Cell';
+      case 'FAITH':
+      case ChurchGroup.FAITH: return 'Faith Cell';
+      case 'HOPE':
+      case ChurchGroup.HOPE: return 'Hope Cell';
+      case 'LOVE':
+      case ChurchGroup.LOVE: return 'Love Cell';
+      default: return 'CACI Cell';
+    }
+  };
+
+  const cell = data.cell || cellLabel(data.churchGroup);
+
+  return template
+    .replace(/\{firstName\}|\[firstName\]|\{name\}|\[name\]|\{Name\}|\[Name\]/gi, first)
+    .replace(/\{lastName\}|\[lastName\]/gi, last)
+    .replace(/\{fullName\}|\[fullName\]/gi, full)
+    .replace(/\{group\}|\[group\]|\{cell\}|\[cell\]/gi, cell)
+    .replace(/\{churchName\}|\[churchName\]/gi, 'Christ Apostolic Church International (CACI)');
+}
+
 // GET /api/messages - message log history (Admin & Media Team)
 messageRouter.get('/', requireRole(UserRole.ADMIN, UserRole.MEDIA_TEAM), async (req: Request, res: Response) => {
   try {
@@ -31,11 +69,17 @@ messageRouter.post('/send', requireRole(UserRole.ADMIN, UserRole.MEDIA_TEAM), as
       return res.status(400).json({ error: 'Phone number and message content are required' });
     }
 
+    const cleanFirstName = recipientName ? recipientName.split(' ')[0] : 'Beloved';
+    const personalizedContent = interpolateMessage(messageContent, {
+      fullName: recipientName,
+      firstName: cleanFirstName
+    });
+
     let smsResult = null;
     if (channel === 'SMS') {
       smsResult = await sendVynfySMS({
         recipients: [recipientPhone],
-        message: messageContent
+        message: personalizedContent
       });
     }
 
@@ -44,7 +88,7 @@ messageRouter.post('/send', requireRole(UserRole.ADMIN, UserRole.MEDIA_TEAM), as
         channel: channel === 'WHATSAPP' ? MessageChannel.WHATSAPP : MessageChannel.SMS,
         recipientPhone,
         recipientName: recipientName || null,
-        messageContent,
+        messageContent: personalizedContent,
         category: category || 'DIRECT_MESSAGE',
         status: MessageStatus.SENT
       }
@@ -52,7 +96,7 @@ messageRouter.post('/send', requireRole(UserRole.ADMIN, UserRole.MEDIA_TEAM), as
 
     // Clean phone number for direct WhatsApp wa.me link
     const cleanPhone = recipientPhone.replace(/[^0-9]/g, '');
-    const encodedText = encodeURIComponent(messageContent);
+    const encodedText = encodeURIComponent(personalizedContent);
     const whatsappUrl = `https://wa.me/${cleanPhone}?text=${encodedText}`;
 
     res.status(201).json({
@@ -164,26 +208,16 @@ messageRouter.post('/broadcast', requireRole(UserRole.ADMIN, UserRole.MEDIA_TEAM
 
     const logs = [];
     const whatsappLinks: { name: string; phone: string; url: string }[] = [];
-    const smsPhones: string[] = [];
-
-    const cellLabel = (grp: ChurchGroup) => {
-      switch (grp) {
-        case ChurchGroup.JOY: return 'Joy Cell';
-        case ChurchGroup.FAITH: return 'Faith Cell';
-        case ChurchGroup.HOPE: return 'Hope Cell';
-        case ChurchGroup.LOVE: return 'Love Cell';
-        default: return 'Cell';
-      }
-    };
+    const smsQueue: { phone: string; message: string; name: string }[] = [];
 
     for (const recipient of recipients) {
       if (!recipient.phone) continue;
 
-      const personalized = defaultMsg
-        .replace(/{firstName}/g, recipient.firstName)
-        .replace(/{lastName}/g, recipient.lastName)
-        .replace(/{group}/g, cellLabel(recipient.churchGroup))
-        .replace(/{cell}/g, cellLabel(recipient.churchGroup));
+      const personalized = interpolateMessage(defaultMsg, {
+        firstName: recipient.firstName,
+        lastName: recipient.lastName,
+        churchGroup: recipient.churchGroup
+      });
 
       const log = await prisma.messageLog.create({
         data: {
@@ -198,7 +232,11 @@ messageRouter.post('/broadcast', requireRole(UserRole.ADMIN, UserRole.MEDIA_TEAM
       logs.push(log);
 
       if (channel === 'SMS') {
-        smsPhones.push(recipient.phone);
+        smsQueue.push({
+          phone: recipient.phone,
+          message: personalized,
+          name: `${recipient.firstName} ${recipient.lastName}`
+        });
       } else {
         const cleanPhone = recipient.phone.replace(/[^0-9]/g, '');
         whatsappLinks.push({
@@ -210,13 +248,50 @@ messageRouter.post('/broadcast', requireRole(UserRole.ADMIN, UserRole.MEDIA_TEAM
     }
 
     // Dispatch via Vynfy SMS Gateway
-    let gatewayResult = null;
-    if (channel === 'SMS' && smsPhones.length > 0) {
-      gatewayResult = await sendVynfySMS({
-        recipients: smsPhones,
-        message: defaultMsg.replace(/{firstName}/g, 'Beloved').replace(/{lastName}/g, '').replace(/{group}/g, 'CACI').replace(/{cell}/g, 'CACI'),
-        senderId: senderId || undefined
-      });
+    let gatewayResult: any = null;
+    if (channel === 'SMS' && smsQueue.length > 0) {
+      const hasPersonalization = /\{firstName\}|\[firstName\]|\{name\}|\[name\]|\{Name\}|\[Name\]|\{lastName\}|\[lastName\]|\{fullName\}|\[fullName\]|\{group\}|\[group\]|\{cell\}|\[cell\]/i.test(defaultMsg);
+
+      if (hasPersonalization && smsQueue.length <= 150) {
+        // Individualized personalized SMS dispatch so each recipient gets their exact name
+        let successCount = 0;
+        let lastGatewayRes: any = null;
+        for (const item of smsQueue) {
+          try {
+            const res = await sendVynfySMS({
+              recipients: [item.phone],
+              message: item.message,
+              senderId: senderId || undefined
+            });
+            if (res.success) successCount++;
+            lastGatewayRes = res;
+          } catch (e) {
+            console.error(`Failed to send personalized SMS to ${item.phone}:`, e);
+          }
+        }
+        gatewayResult = {
+          success: successCount > 0,
+          status: successCount > 0 ? 'DELIVERED' : 'FAILED',
+          recipientCount: smsQueue.length,
+          personalized: true,
+          successCount,
+          lastResponse: lastGatewayRes
+        };
+      } else {
+        // Bulk batch dispatch
+        const allPhones = smsQueue.map(s => s.phone);
+        const fallbackMsg = interpolateMessage(defaultMsg, {
+          firstName: 'Beloved',
+          lastName: '',
+          fullName: 'Beloved',
+          churchGroup: 'CACI'
+        });
+        gatewayResult = await sendVynfySMS({
+          recipients: allPhones,
+          message: fallbackMsg,
+          senderId: senderId || undefined
+        });
+      }
     }
 
     res.json({

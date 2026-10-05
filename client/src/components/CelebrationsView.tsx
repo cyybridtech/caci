@@ -318,8 +318,12 @@ export const CelebrationsView: React.FC<CelebrationsViewProps> = ({ onSendMessag
                         <a
                           href={`https://wa.me/${c.phone.replace(/[^0-9]/g, '')}?text=${encodeURIComponent(
                             c.celebrationType === 'BIRTHDAY'
-                              ? birthdayTemplate.replace('{firstName}', c.firstName)
-                              : anniversaryTemplate.replace('{firstName}', c.firstName)
+                              ? birthdayTemplate
+                                  .replace(/\{firstName\}|\[firstName\]|\{name\}|\[name\]|\{Name\}|\[Name\]/gi, c.firstName)
+                                  .replace(/\{lastName\}|\[lastName\]/gi, c.lastName)
+                              : anniversaryTemplate
+                                  .replace(/\{firstName\}|\[firstName\]|\{name\}|\[name\]|\{Name\}|\[Name\]/gi, c.firstName)
+                                  .replace(/\{lastName\}|\[lastName\]/gi, c.lastName)
                           )}`}
                           target="_blank"
                           rel="noreferrer"
