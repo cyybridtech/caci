@@ -18,22 +18,30 @@ const VYNFY_API_KEY = process.env.VYNFY_API_KEY || 'a5a9ec5fb9c6612a0df7f953b53f
 const DEFAULT_SENDER_ID = process.env.VYNFY_SENDER_ID || 'CACI ';
 
 /**
+ * Check if a phone number is a valid Ghana phone number
+ */
+export function isValidGhanaPhoneNumber(phone: string): boolean {
+  if (!phone) return false;
+  const clean = phone.replace(/[^0-9]/g, '');
+  if (clean.startsWith('0') && clean.length === 10) {
+    return /^0(2[034678]|5[0345679]|3[0-9])[0-9]{7}$/.test(clean);
+  }
+  if (clean.startsWith('233') && clean.length === 12) {
+    return /^233(2[034678]|5[0345679]|3[0-9])[0-9]{7}$/.test(clean);
+  }
+  return false;
+}
+
+/**
  * Normalize phone numbers to international Ghana format (e.g. 233241234567)
  */
 export function formatGhanaPhoneNumber(phone: string): string {
   if (!phone) return '';
-  const clean = phone.replace(/[^0-9]/g, '');
+  let clean = phone.replace(/[^0-9]/g, '');
   if (clean.startsWith('2330') && clean.length === 13) {
-    return '233' + clean.substring(4);
-  }
-  if (clean.startsWith('0') && clean.length === 10) {
-    return '233' + clean.substring(1);
-  }
-  if (clean.startsWith('233') && clean.length === 12) {
-    return clean;
-  }
-  if (clean.length === 9) {
-    return '233' + clean;
+    clean = '233' + clean.substring(4);
+  } else if (clean.startsWith('0') && clean.length === 10) {
+    clean = '233' + clean.substring(1);
   }
   return clean;
 }
@@ -44,15 +52,16 @@ export function formatGhanaPhoneNumber(phone: string): string {
  */
 export async function sendVynfySMS(options: VynfySendOptions): Promise<VynfySendResult> {
   const formattedRecipients = options.recipients
+    .filter(isValidGhanaPhoneNumber)
     .map(formatGhanaPhoneNumber)
-    .filter(p => p.length >= 10);
+    .filter(p => p.startsWith('233') && p.length === 12);
 
   if (formattedRecipients.length === 0) {
     return {
       success: false,
       status: 'FAILED',
       recipientCount: 0,
-      error: 'No valid phone numbers provided'
+      error: 'No valid Ghana phone numbers provided'
     };
   }
 
