@@ -21,7 +21,11 @@ const DEFAULT_SENDER_ID = process.env.VYNFY_SENDER_ID || 'CACI ';
  * Normalize phone numbers to international Ghana format (e.g. 233241234567)
  */
 export function formatGhanaPhoneNumber(phone: string): string {
+  if (!phone) return '';
   const clean = phone.replace(/[^0-9]/g, '');
+  if (clean.startsWith('2330') && clean.length === 13) {
+    return '233' + clean.substring(4);
+  }
   if (clean.startsWith('0') && clean.length === 10) {
     return '233' + clean.substring(1);
   }

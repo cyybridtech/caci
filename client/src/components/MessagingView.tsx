@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   MessageSquare,
   Send,
@@ -16,9 +16,16 @@ import {
   ShieldCheck,
   Zap,
   Info,
-  UserCheck
+  UserCheck,
+  Building,
+  RefreshCw,
+  Copy,
+  Check,
+  Filter,
+  AlertCircle
 } from 'lucide-react';
 import { ServiceSession, Department, MessageLog, AttendanceRecord, Member, ChurchGroup } from '../types/index.ts';
+import { api } from '../services/api.ts';
 
 interface MessagingViewProps {
   session: ServiceSession | null;
@@ -42,7 +49,7 @@ interface MessagingViewProps {
 export const MessagingView: React.FC<MessagingViewProps> = ({
   session,
   departments,
-  messageLogs,
+  messageLogs: initialLogs,
   attendanceRecords,
   members,
   onBroadcast,
@@ -58,6 +65,30 @@ export const MessagingView: React.FC<MessagingViewProps> = ({
   const [feedback, setFeedback] = useState<string | null>(null);
   const [gatewayResult, setGatewayResult] = useState<any>(null);
   const [whatsappLinks, setWhatsappLinks] = useState<{ name: string; phone: string; url: string }[]>([]);
+  const [clickedWhatsAppUrls, setClickedWhatsAppUrls] = useState<Set<string>>(new Set());
+  const [copiedMessage, setCopiedMessage] = useState(false);
+
+  // Message Logs management
+  const [logs, setLogs] = useState<MessageLog[]>(initialLogs);
+  const [isRefreshingLogs, setIsRefreshingLogs] = useState(false);
+  const [logSearchQuery, setLogSearchQuery] = useState('');
+  const [logChannelFilter, setLogChannelFilter] = useState<'ALL' | 'SMS' | 'WHATSAPP'>('ALL');
+
+  useEffect(() => {
+    setLogs(initialLogs);
+  }, [initialLogs]);
+
+  const refreshLogs = async () => {
+    try {
+      setIsRefreshingLogs(true);
+      const data = await api.getMessageLogs();
+      setLogs(data);
+    } catch (err: any) {
+      console.error('Failed to refresh logs:', err);
+    } finally {
+      setIsRefreshingLogs(false);
+    }
+  };
 
   // Test single number SMS
   const [testPhone, setTestPhone] = useState('');
@@ -68,6 +99,12 @@ export const MessagingView: React.FC<MessagingViewProps> = ({
   const [selectedMemberIds, setSelectedMemberIds] = useState<string[]>([]);
   const [memberSearchQuery, setMemberSearchQuery] = useState('');
   const [memberGroupFilter, setMemberGroupFilter] = useState<'ALL' | 'JOY' | 'FAITH' | 'HOPE' | 'LOVE'>('ALL');
+
+  // Sync initialTarget / initialDeptId if changed from parent
+  useEffect(() => {
+    if (initialTarget) setTargetType(initialTarget);
+    if (initialDeptId) setSelectedDeptId(initialDeptId);
+  }, [initialTarget, initialDeptId]);
 
   // Filter members for specific selection
   const selectableMembers = members.filter((m) => {
@@ -118,10 +155,14 @@ export const MessagingView: React.FC<MessagingViewProps> = ({
     if (targetType === 'LOVE') {
       return "Calvary greetings {firstName}! Important announcement for all CACI Love Cell members: please take note of our upcoming cell fellowship.";
     }
+    if (targetType === 'DEPARTMENT') {
+      const currentDept = departments.find((d) => d.id === selectedDeptId);
+      return `Calvary greetings {firstName}! Important update for all ${currentDept ? currentDept.name : 'department'} members at CACI.`;
+    }
     if (targetType === 'SPECIFIC_MEMBERS') {
       return "Calvary greetings {firstName}! Please take note of this special church announcement from CACI leadership.";
     }
-    return "Calvary greetings {firstName}! Important notification from your department at CACI.";
+    return "Calvary greetings {firstName}! Please take note of this special church update from CACI leadership.";
   };
 
   const handleSendBroadcast = async (e: React.FormEvent) => {
@@ -132,11 +173,17 @@ export const MessagingView: React.FC<MessagingViewProps> = ({
       return;
     }
 
+    if ((targetType === 'ATTENDEES_TODAY' || targetType === 'ABSENTEES_TODAY') && !session?.id) {
+      setFeedback('Please select or create an active service session from the top header bar before messaging attendees/absentees.');
+      return;
+    }
+
     try {
       setIsSending(true);
       setFeedback(null);
       setGatewayResult(null);
       setWhatsappLinks([]);
+      setClickedWhatsAppUrls(new Set());
 
       const res = await onBroadcast({
         targetType,
@@ -155,6 +202,7 @@ export const MessagingView: React.FC<MessagingViewProps> = ({
       if (res.whatsappLinks && res.whatsappLinks.length > 0) {
         setWhatsappLinks(res.whatsappLinks);
       }
+      await refreshLogs();
     } catch (err: any) {
       setFeedback(err.message || 'Failed to dispatch messages');
     } finally {
@@ -171,30 +219,51 @@ export const MessagingView: React.FC<MessagingViewProps> = ({
     try {
       setIsTestingSingle(true);
       setTestResult(null);
-      const res = await fetch('http://localhost:5000/api/messages/send', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          channel: 'SMS',
-          recipientPhone: testPhone.trim(),
-          recipientName: 'Test Recipient',
-          messageContent: customMessage.trim() || 'Test message from CACI Church Management System via Vynfy.',
-          category: 'TEST_SMS',
-          senderId: senderId.trim() || undefined
-        })
+      const res = await api.sendMessage({
+        channel: 'SMS',
+        recipientPhone: testPhone.trim(),
+        recipientName: 'Test Recipient',
+        messageContent: customMessage.trim() || 'Test message from CACI Church Management System via Vynfy.',
+        category: 'TEST_SMS',
+        senderId: senderId.trim() || undefined
       });
-      const data = await res.json();
-      setTestResult(data);
+      setTestResult(res);
+      setFeedback('Test SMS dispatched via Vynfy Gateway');
+      await refreshLogs();
     } catch (err: any) {
-      setTestResult({ success: false, error: err.message });
+      setTestResult({ success: false, gateway: { success: false, status: 'FAILED', error: err.message } });
+      setFeedback(err.message || 'Failed to send test SMS');
     } finally {
       setIsTestingSingle(false);
     }
   };
 
+  const handleCopyMessage = () => {
+    const textToCopy = customMessage.trim() || getPlaceholderMessage();
+    navigator.clipboard.writeText(textToCopy);
+    setCopiedMessage(true);
+    setTimeout(() => setCopiedMessage(false), 2000);
+  };
+
   const activeMessageText = customMessage.trim() || getPlaceholderMessage();
   const charCount = activeMessageText.length;
   const smsPages = Math.ceil(charCount / 160) || 1;
+
+  // Selected Department Info
+  const currentSelectedDept = departments.find((d) => d.id === selectedDeptId);
+
+  // Filtered Message Logs
+  const filteredLogs = logs.filter((log) => {
+    if (logChannelFilter !== 'ALL' && log.channel !== logChannelFilter) return false;
+    if (logSearchQuery.trim() !== '') {
+      const q = logSearchQuery.toLowerCase().trim();
+      const name = (log.recipientName || '').toLowerCase();
+      const phone = (log.recipientPhone || '').toLowerCase();
+      const content = (log.messageContent || '').toLowerCase();
+      return name.includes(q) || phone.includes(q) || content.includes(q);
+    }
+    return true;
+  });
 
   return (
     <div className="space-y-6">
@@ -213,7 +282,7 @@ export const MessagingView: React.FC<MessagingViewProps> = ({
               </span>
             </div>
             <p className="text-xs text-slate-500 mt-0.5">
-              Automated service follow-ups, group notices, and custom targeted SMS broadcasts across Ghana
+              Automated service follow-ups, cell notices, department updates, and targeted SMS & WhatsApp broadcasts
             </p>
           </div>
         </div>
@@ -223,7 +292,7 @@ export const MessagingView: React.FC<MessagingViewProps> = ({
           <div className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse"></div>
           <div>
             <span className="text-[10px] uppercase font-bold text-slate-400 block">Active Provider</span>
-            <span className="font-mono font-bold text-amber-300">Vynfy SMS Gateway (a5a9ec...)</span>
+            <span className="font-mono font-bold text-amber-300">Vynfy SMS Gateway</span>
           </div>
         </div>
       </div>
@@ -249,12 +318,22 @@ export const MessagingView: React.FC<MessagingViewProps> = ({
 
             {feedback && (
               <div className={`p-3.5 rounded-2xl border text-xs font-bold flex items-center space-x-2 ${
-                feedback.includes('success') || feedback.includes('Sent')
+                feedback.includes('success') || feedback.includes('Dispatched') || feedback.includes('Sent')
                   ? 'bg-emerald-50 border-emerald-200 text-emerald-800'
                   : 'bg-amber-50 border-amber-200 text-amber-800'
               }`}>
                 <Info className="w-4 h-4 shrink-0" />
                 <span>{feedback}</span>
+              </div>
+            )}
+
+            {/* Missing Session Warning */}
+            {(targetType === 'ATTENDEES_TODAY' || targetType === 'ABSENTEES_TODAY') && !session && (
+              <div className="p-3.5 rounded-2xl bg-amber-50 border border-amber-200 text-amber-900 text-xs flex items-center space-x-2.5">
+                <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
+                <span>
+                  <strong>Active Session Notice:</strong> No service session is currently selected in the top bar. Please choose or create a service session in the header so the system knows which attendance list to query.
+                </span>
               </div>
             )}
 
@@ -322,7 +401,7 @@ export const MessagingView: React.FC<MessagingViewProps> = ({
                     <div>
                       <span className="text-xs font-bold block">Today's Absentees</span>
                       <span className="text-[11px] text-slate-500">
-                        {Math.max(0, members.length - attendanceRecords.length)} absent
+                        {Math.max(0, members.filter(m => m.status === 'ACTIVE').length - attendanceRecords.length)} absent
                       </span>
                     </div>
                     <HeartHandshake className="w-4 h-4 text-amber-600" />
@@ -339,7 +418,9 @@ export const MessagingView: React.FC<MessagingViewProps> = ({
                   >
                     <div>
                       <span className="text-xs font-bold block">All Active Members</span>
-                      <span className="text-[11px] text-slate-500">{members.length} congregants</span>
+                      <span className="text-[11px] text-slate-500">
+                        {members.filter(m => m.status === 'ACTIVE').length} congregants
+                      </span>
                     </div>
                     <Users className="w-4 h-4 text-slate-700" />
                   </button>
@@ -415,12 +496,67 @@ export const MessagingView: React.FC<MessagingViewProps> = ({
                     </div>
                     <span className="w-2.5 h-2.5 rounded-full bg-rose-600"></span>
                   </button>
+
+                  {/* Department & Auxiliary Target */}
+                  <button
+                    type="button"
+                    onClick={() => setTargetType('DEPARTMENT')}
+                    className={`p-3 rounded-2xl border-2 text-left transition flex items-center justify-between ${
+                      targetType === 'DEPARTMENT'
+                        ? 'border-purple-600 bg-purple-50/70 text-purple-950 font-bold'
+                        : 'border-slate-200 text-slate-600 hover:border-slate-300'
+                    }`}
+                  >
+                    <div>
+                      <span className="text-xs font-bold block">Auxiliary / Dept</span>
+                      <span className="text-[11px] text-slate-500">
+                        {currentSelectedDept ? currentSelectedDept.name : `${departments.length} Auxiliaries`}
+                      </span>
+                    </div>
+                    <Building className="w-4 h-4 text-purple-600" />
+                  </button>
                 </div>
               </div>
 
+              {/* Department Selector Box (when DEPARTMENT is active) */}
+              {targetType === 'DEPARTMENT' && (
+                <div className="p-4 rounded-3xl bg-purple-50/70 border-2 border-purple-200 space-y-3 animate-in fade-in duration-200">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+                    <div>
+                      <span className="text-xs font-extrabold text-purple-950 uppercase tracking-wider block">
+                        Select Department or Auxiliary
+                      </span>
+                      <span className="text-[11px] text-purple-800">
+                        Message will be dispatched to all members enrolled in this ministry.
+                      </span>
+                    </div>
+
+                    <div className="w-full sm:w-64">
+                      {departments.length === 0 ? (
+                        <div className="text-xs text-purple-900 italic font-semibold">
+                          No departments created yet.
+                        </div>
+                      ) : (
+                        <select
+                          value={selectedDeptId}
+                          onChange={(e) => setSelectedDeptId(e.target.value)}
+                          className="w-full px-3 py-2 bg-white border border-purple-300 rounded-xl text-xs font-bold text-purple-950 focus:outline-none focus:ring-2 focus:ring-purple-500 shadow-xs"
+                        >
+                          {departments.map((dept) => (
+                            <option key={dept.id} value={dept.id}>
+                              {dept.name} ({dept.members?.length || 0} members)
+                            </option>
+                          ))}
+                        </select>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {/* Specific Members Picker Drawer (when SPECIFIC_MEMBERS is active) */}
               {targetType === 'SPECIFIC_MEMBERS' && (
-                <div className="p-4 rounded-3xl bg-indigo-50/60 border-2 border-indigo-200 space-y-3">
+                <div className="p-4 rounded-3xl bg-indigo-50/60 border-2 border-indigo-200 space-y-3 animate-in fade-in duration-200">
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <span className="text-xs font-extrabold text-indigo-950 uppercase tracking-wider">
                       Select Specific Members to Message ({selectedMemberIds.length} selected)
@@ -450,100 +586,67 @@ export const MessagingView: React.FC<MessagingViewProps> = ({
                       <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-2.5" />
                       <input
                         type="text"
-                        placeholder="Search member by name, phone, or ID..."
+                        placeholder="Search by name, phone or code..."
                         value={memberSearchQuery}
                         onChange={(e) => setMemberSearchQuery(e.target.value)}
-                        className="w-full pl-9 pr-3 py-1.5 bg-white border border-indigo-200 rounded-xl text-xs font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                        className="w-full pl-8 pr-3 py-1.5 bg-white border border-indigo-200 rounded-xl text-xs font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
                       />
                     </div>
 
-                    <div className="flex items-center space-x-1 bg-white p-1 rounded-xl border border-indigo-200 overflow-x-auto">
-                      <button
-                        type="button"
-                        onClick={() => setMemberGroupFilter('ALL')}
-                        className={`px-2 py-1 rounded-lg text-[11px] font-bold ${
-                          memberGroupFilter === 'ALL' ? 'bg-indigo-600 text-white' : 'text-slate-600'
-                        }`}
-                      >
-                        All
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setMemberGroupFilter('JOY')}
-                        className={`px-2 py-1 rounded-lg text-[11px] font-bold ${
-                          memberGroupFilter === 'JOY' ? 'bg-amber-500 text-white' : 'text-amber-700'
-                        }`}
-                      >
-                        Joy
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setMemberGroupFilter('FAITH')}
-                        className={`px-2 py-1 rounded-lg text-[11px] font-bold ${
-                          memberGroupFilter === 'FAITH' ? 'bg-blue-600 text-white' : 'text-blue-700'
-                        }`}
-                      >
-                        Faith
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setMemberGroupFilter('HOPE')}
-                        className={`px-2 py-1 rounded-lg text-[11px] font-bold ${
-                          memberGroupFilter === 'HOPE' ? 'bg-emerald-600 text-white' : 'text-emerald-700'
-                        }`}
-                      >
-                        Hope
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setMemberGroupFilter('LOVE')}
-                        className={`px-2 py-1 rounded-lg text-[11px] font-bold ${
-                          memberGroupFilter === 'LOVE' ? 'bg-rose-600 text-white' : 'text-rose-700'
-                        }`}
-                      >
-                        Love
-                      </button>
+                    <div className="flex items-center space-x-1 text-[11px]">
+                      {(['ALL', 'JOY', 'FAITH', 'HOPE', 'LOVE'] as const).map((grp) => (
+                        <button
+                          key={grp}
+                          type="button"
+                          onClick={() => setMemberGroupFilter(grp)}
+                          className={`px-2 py-1 rounded-lg font-bold transition ${
+                            memberGroupFilter === grp
+                              ? 'bg-indigo-600 text-white'
+                              : 'bg-white border border-indigo-200 text-indigo-900 hover:bg-indigo-100'
+                          }`}
+                        >
+                          {grp === 'ALL' ? 'All' : grp}
+                        </button>
+                      ))}
                     </div>
                   </div>
 
-                  {/* Members Checkbox List */}
-                  <div className="max-h-56 overflow-y-auto space-y-1.5 bg-white p-2.5 rounded-2xl border border-indigo-200 divide-y divide-slate-100">
+                  {/* Member Selection List */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-56 overflow-y-auto pr-1">
                     {selectableMembers.map((member) => {
                       const isSelected = selectedMemberIds.includes(member.id);
-                      const hasPhone = Boolean(member.phone);
-
                       return (
                         <div
                           key={member.id}
-                          onClick={() => hasPhone && toggleSelectMember(member.id)}
-                          className={`p-2 rounded-xl flex items-center justify-between gap-3 cursor-pointer transition ${
+                          onClick={() => toggleSelectMember(member.id)}
+                          className={`p-2.5 rounded-2xl border transition cursor-pointer flex items-center justify-between ${
                             isSelected
-                              ? 'bg-indigo-50 border border-indigo-300'
-                              : hasPhone
-                              ? 'hover:bg-slate-50'
-                              : 'opacity-50 cursor-not-allowed'
+                              ? 'bg-indigo-600 text-white border-indigo-600 shadow-xs'
+                              : 'bg-white border-indigo-100 text-slate-800 hover:border-indigo-300'
                           }`}
                         >
-                          <div className="flex items-center space-x-2.5 min-w-0">
-                            <input
-                              type="checkbox"
-                              checked={isSelected}
-                              disabled={!hasPhone}
-                              onChange={() => hasPhone && toggleSelectMember(member.id)}
-                              className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 border-slate-300"
-                            />
+                          <div className="flex items-center space-x-2.5 truncate">
+                            <div className="shrink-0">
+                              {isSelected ? (
+                                <CheckSquare className="w-4 h-4 text-white" />
+                              ) : (
+                                <Square className="w-4 h-4 text-slate-400" />
+                              )}
+                            </div>
 
                             {member.photoUrl ? (
                               <img
                                 src={member.photoUrl}
-                                alt=""
-                                className="w-7 h-7 rounded-lg object-cover shrink-0"
+                                alt={member.firstName}
+                                className="w-7 h-7 rounded-full object-cover shrink-0 border"
                               />
                             ) : (
                               <div
-                                className={`w-7 h-7 rounded-lg flex items-center justify-center font-bold text-[10px] text-white shrink-0 ${
-                                  member.churchGroup === 'JOY'
-                                    ? 'bg-amber-500'
+                                className={`w-7 h-7 rounded-full flex items-center justify-center font-extrabold text-[10px] text-white shrink-0 ${
+                                  isSelected
+                                    ? 'bg-indigo-800'
+                                    : member.churchGroup === 'JOY'
+                                    ? 'bg-amber-600'
                                     : member.churchGroup === 'FAITH'
                                     ? 'bg-blue-600'
                                     : member.churchGroup === 'HOPE'
@@ -557,11 +660,11 @@ export const MessagingView: React.FC<MessagingViewProps> = ({
                             )}
 
                             <div className="truncate">
-                              <span className="font-extrabold text-xs text-slate-900 block truncate">
+                              <span className={`font-extrabold text-xs block truncate ${isSelected ? 'text-white' : 'text-slate-900'}`}>
                                 {member.firstName} {member.lastName}
                               </span>
-                              <span className="text-[10px] text-slate-500 font-mono">
-                                {member.phone || 'No phone registered'}
+                              <span className={`text-[10px] font-mono ${isSelected ? 'text-indigo-200' : 'text-slate-500'}`}>
+                                {member.phone || 'No phone'}
                               </span>
                             </div>
                           </div>
@@ -569,7 +672,9 @@ export const MessagingView: React.FC<MessagingViewProps> = ({
                           <div className="flex items-center space-x-1.5 shrink-0">
                             <span
                               className={`px-1.5 py-0.2 rounded text-[9px] font-extrabold uppercase ${
-                                member.churchGroup === 'JOY'
+                                isSelected
+                                  ? 'bg-indigo-700 text-white'
+                                  : member.churchGroup === 'JOY'
                                   ? 'bg-amber-100 text-amber-800'
                                   : member.churchGroup === 'FAITH'
                                   ? 'bg-blue-100 text-blue-800'
@@ -580,11 +685,6 @@ export const MessagingView: React.FC<MessagingViewProps> = ({
                             >
                               {member.churchGroup}
                             </span>
-                            {member.role !== 'Member' && (
-                              <span className="px-1.5 py-0.2 rounded text-[9px] font-semibold bg-slate-100 text-slate-700">
-                                {member.role}
-                              </span>
-                            )}
                           </div>
                         </div>
                       );
@@ -665,13 +765,23 @@ export const MessagingView: React.FC<MessagingViewProps> = ({
                     <Sparkles className="w-3.5 h-3.5 text-amber-500" />
                     <span>3. Pick a Ready-to-Send Template or Write Custom</span>
                   </label>
-                  <button
-                    type="button"
-                    onClick={() => setCustomMessage('')}
-                    className="text-[11px] text-slate-400 hover:text-slate-600 font-bold"
-                  >
-                    Clear Text
-                  </button>
+                  <div className="flex items-center space-x-2">
+                    <button
+                      type="button"
+                      onClick={handleCopyMessage}
+                      className="text-[11px] text-slate-600 hover:text-slate-900 font-bold flex items-center space-x-1"
+                    >
+                      {copiedMessage ? <Check className="w-3 h-3 text-emerald-600" /> : <Copy className="w-3 h-3 text-slate-500" />}
+                      <span>{copiedMessage ? 'Copied!' : 'Copy Text'}</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setCustomMessage('')}
+                      className="text-[11px] text-slate-400 hover:text-slate-600 font-bold"
+                    >
+                      Clear
+                    </button>
+                  </div>
                 </div>
 
                 {/* Quick Template Presets */}
@@ -909,7 +1019,7 @@ export const MessagingView: React.FC<MessagingViewProps> = ({
             </div>
 
             <p className="text-[11px] text-slate-500">
-              Send a test SMS to a specific Ghana phone number right now using your Vynfy API key.
+              Send a test SMS to a specific Ghana phone number right now using your authenticated Vynfy SMS Gateway.
             </p>
 
             <div className="flex flex-col sm:flex-row items-center gap-2.5">
@@ -943,12 +1053,12 @@ export const MessagingView: React.FC<MessagingViewProps> = ({
 
             {testResult && (
               <div className={`p-3 rounded-xl border text-[11px] font-mono space-y-1 ${
-                testResult.gateway?.success
+                testResult.gateway?.success || testResult.success
                   ? 'bg-emerald-50 border-emerald-200 text-emerald-900'
                   : 'bg-amber-50 border-amber-200 text-amber-900'
               }`}>
                 <div className="font-bold flex items-center justify-between">
-                  <span>Gateway Response: {testResult.gateway?.status || 'SENT'}</span>
+                  <span>Gateway Response: {testResult.gateway?.status || (testResult.success ? 'SENT' : 'FAILED')}</span>
                   <span>{testResult.gateway?.recipientCount || 1} recipient</span>
                 </div>
                 {testResult.gateway?.error && (
@@ -962,38 +1072,57 @@ export const MessagingView: React.FC<MessagingViewProps> = ({
 
           {/* Generated WhatsApp Direct Links (if WhatsApp selected) */}
           {whatsappLinks.length > 0 && (
-            <div className="bg-white p-6 rounded-3xl border border-emerald-200 shadow-sm space-y-3">
-              <div className="flex items-center justify-between">
+            <div className="bg-white p-6 rounded-3xl border border-emerald-200 shadow-sm space-y-3 animate-in fade-in duration-200">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                 <div className="flex items-center space-x-2">
                   <Share2 className="w-4 h-4 text-emerald-600" />
                   <h4 className="font-bold text-sm text-slate-900">
                     Ready-to-Send WhatsApp Chats ({whatsappLinks.length})
                   </h4>
                 </div>
-                <span className="text-[11px] text-slate-500">
-                  Click any member to open WhatsApp
-                </span>
+                <div className="flex items-center space-x-2 text-[11px] text-slate-500">
+                  <span>
+                    {clickedWhatsAppUrls.size} of {whatsappLinks.length} opened
+                  </span>
+                </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-60 overflow-y-auto pr-1">
-                {whatsappLinks.map((item, idx) => (
-                  <a
-                    key={idx}
-                    href={item.url}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="p-3 rounded-2xl bg-emerald-50/70 border border-emerald-200 hover:bg-emerald-100 flex items-center justify-between transition group text-xs"
-                  >
-                    <div>
-                      <span className="font-bold text-slate-900 block">{item.name}</span>
-                      <span className="text-[11px] text-slate-500 font-mono">{item.phone}</span>
-                    </div>
-                    <div className="flex items-center space-x-1 text-emerald-700 font-bold group-hover:translate-x-0.5 transition">
-                      <span>Chat</span>
-                      <ExternalLink className="w-3.5 h-3.5" />
-                    </div>
-                  </a>
-                ))}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-64 overflow-y-auto pr-1">
+                {whatsappLinks.map((item, idx) => {
+                  const isOpened = clickedWhatsAppUrls.has(item.url);
+                  return (
+                    <a
+                      key={idx}
+                      href={item.url}
+                      target="_blank"
+                      rel="noreferrer"
+                      onClick={() => setClickedWhatsAppUrls((prev) => new Set([...prev, item.url]))}
+                      className={`p-3 rounded-2xl border flex items-center justify-between transition group text-xs ${
+                        isOpened
+                          ? 'bg-slate-50 border-slate-200 text-slate-500'
+                          : 'bg-emerald-50/70 border-emerald-200 hover:bg-emerald-100 text-slate-900'
+                      }`}
+                    >
+                      <div>
+                        <div className="flex items-center space-x-1.5">
+                          <span className="font-bold block">{item.name}</span>
+                          {isOpened && (
+                            <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-slate-200 text-slate-600">
+                              Opened
+                            </span>
+                          )}
+                        </div>
+                        <span className="text-[11px] text-slate-500 font-mono">{item.phone}</span>
+                      </div>
+                      <div className={`flex items-center space-x-1 font-bold group-hover:translate-x-0.5 transition ${
+                        isOpened ? 'text-slate-500' : 'text-emerald-700'
+                      }`}>
+                        <span>Chat</span>
+                        <ExternalLink className="w-3.5 h-3.5" />
+                      </div>
+                    </a>
+                  );
+                })}
               </div>
             </div>
           )}
@@ -1006,18 +1135,60 @@ export const MessagingView: React.FC<MessagingViewProps> = ({
               <Clock className="w-4 h-4 text-blue-600" />
               <h3 className="font-bold text-sm text-slate-900">Message Delivery Log</h3>
             </div>
-            <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-600">
-              {messageLogs.length} dispatched
-            </span>
+            <div className="flex items-center space-x-1.5">
+              <button
+                type="button"
+                onClick={refreshLogs}
+                disabled={isRefreshingLogs}
+                title="Refresh logs"
+                className="p-1 rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${isRefreshingLogs ? 'animate-spin text-blue-600' : ''}`} />
+              </button>
+              <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-600">
+                {filteredLogs.length}
+              </span>
+            </div>
           </div>
 
-          {messageLogs.length === 0 ? (
+          {/* Search & Channel Filter */}
+          <div className="space-y-2">
+            <div className="relative">
+              <Search className="w-3 h-3 text-slate-400 absolute left-2.5 top-2.5" />
+              <input
+                type="text"
+                placeholder="Search delivery logs..."
+                value={logSearchQuery}
+                onChange={(e) => setLogSearchQuery(e.target.value)}
+                className="w-full pl-7 pr-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+
+            <div className="flex items-center space-x-1 text-[10px]">
+              {(['ALL', 'SMS', 'WHATSAPP'] as const).map((chan) => (
+                <button
+                  key={chan}
+                  type="button"
+                  onClick={() => setLogChannelFilter(chan)}
+                  className={`px-2 py-0.5 rounded-lg font-bold transition ${
+                    logChannelFilter === chan
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                  }`}
+                >
+                  {chan === 'ALL' ? 'All' : chan}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {filteredLogs.length === 0 ? (
             <div className="py-12 text-center text-slate-400 text-xs">
-              No messages have been dispatched yet.
+              {logs.length === 0 ? 'No messages have been dispatched yet.' : 'No matching logs found.'}
             </div>
           ) : (
             <div className="space-y-3 max-h-[520px] overflow-y-auto pr-1">
-              {messageLogs.map((log) => (
+              {filteredLogs.map((log) => (
                 <div
                   key={log.id}
                   className="p-3 rounded-2xl bg-slate-50 border border-slate-200/80 text-xs space-y-1.5"
