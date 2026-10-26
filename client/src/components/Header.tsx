@@ -386,7 +386,7 @@ export const Header: React.FC<HeaderProps> = ({
               {showRoleSwitcher && (
                 <div className="absolute right-0 mt-2 w-64 bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl p-2 z-50 space-y-1 animate-in fade-in zoom-in-95">
                   <div className="px-3 py-1.5 text-[10px] uppercase font-bold text-slate-400 border-b border-slate-800 flex items-center justify-between">
-                    <span>Developer Impersonation</span>
+                    <span>Developer Preview · UI only</span>
                     <Terminal className="w-3 h-3 text-purple-400" />
                   </div>
 
@@ -542,8 +542,8 @@ export const Header: React.FC<HeaderProps> = ({
       </div>
 
       {/* Navigation Tabs */}
-      <div className="max-w-7xl mx-auto px-2 sm:px-4 lg:px-8 py-2 border-t border-slate-800">
-        <nav className="flex overflow-x-auto scrollbar-none gap-1 bg-slate-950/60 p-1.5 rounded-2xl border border-slate-800/80 shadow-inner sm:flex-wrap">
+      <div className="mobile-tabbar fixed inset-x-0 bottom-0 z-40 border-t border-slate-800 bg-slate-950/95 px-2 pt-2 backdrop-blur-md md:static md:z-auto md:mx-auto md:max-w-7xl md:border-t md:px-4 md:py-2 md:bg-transparent lg:px-8">
+        <nav aria-label="Main navigation" className="flex overflow-x-auto scrollbar-none gap-1 bg-slate-950/60 p-1.5 rounded-2xl border border-slate-800/80 shadow-inner md:flex-wrap">
           {/* 1. Check-In */}
           {isRoleAuthorizedForTab('checkin') && (
             <button

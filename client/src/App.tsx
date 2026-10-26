@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { Header } from './components/Header.tsx';
 import { CheckInDesk } from './components/CheckInDesk.tsx';
 import { MembersDirectory } from './components/MembersDirectory.tsx';
@@ -123,15 +123,21 @@ export const App: React.FC = () => {
   const [offlineQueueCount, setOfflineQueueCount] = useState(offlineSync.getTotalQueueCount());
   const [isSyncing, setIsSyncing] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [toastTone, setToastTone] = useState<'success' | 'error' | 'info'>('success');
+  const [dataLoadFailures, setDataLoadFailures] = useState<string[]>([]);
+  const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Messaging navigation params
   const [messagingTarget, setMessagingTarget] = useState<string>('ATTENDEES_TODAY');
   const [messagingDeptId, setMessagingDeptId] = useState<string | undefined>(undefined);
 
-  const showToast = (msg: string) => {
+  const showToast = (msg: string, tone: 'success' | 'error' | 'info' = 'success') => {
+    setToastTone(tone);
     setToastMessage(msg);
-    setTimeout(() => {
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    toastTimerRef.current = setTimeout(() => {
       setToastMessage(null);
+      toastTimerRef.current = null;
     }, 3500);
   };
 
@@ -161,28 +167,34 @@ export const App: React.FC = () => {
 
   const loadData = useCallback(async () => {
     if (!isAuthenticated) return;
+    setDataLoadFailures([]);
+    setIsLoading(true);
+
+    const requestOrFallback = async <T,>(label: string, request: Promise<T>, fallback: T): Promise<T> => {
+      try {
+        return await request;
+      } catch (error) {
+        console.warn(`Unable to load ${label}:`, error);
+        setDataLoadFailures((previous) => previous.includes(label) ? previous : [...previous, label]);
+        return fallback;
+      }
+    };
+
     try {
-      setIsLoading(true);
       const role = user?.role;
 
       if (role === 'FINANCE') {
-        // Finance only needs members, finances, summary, and sessions
         const [fetchedMembers, fetchedFinances, finSummary, fetchedActive, fetchedSessions] = await Promise.all([
-          api.getMembers().catch(() => []),
-          api.getFinances().catch(() => []),
-          api.getFinancialSummary().catch(() => null),
-          api.getActiveSession().catch(() => null),
-          api.getSessions().catch(() => [])
+          requestOrFallback('members', api.getMembers(), [] as Member[]),
+          requestOrFallback('contributions', api.getFinances(), [] as FinancialContribution[]),
+          requestOrFallback('financial summary', api.getFinancialSummary(), null),
+          requestOrFallback('active service', api.getActiveSession(), null),
+          requestOrFallback('service sessions', api.getSessions(), [] as ServiceSession[])
         ]);
 
         const savedSessionId = localStorage.getItem('caci_selected_session_id');
-        let effectiveActive = fetchedSessions.find((s) => s.id === savedSessionId);
-        if (!effectiveActive) {
-          effectiveActive = fetchedActive || fetchedSessions[0] || null;
-        }
-        if (effectiveActive) {
-          localStorage.setItem('caci_selected_session_id', effectiveActive.id);
-        }
+        const effectiveActive = fetchedSessions.find((s) => s.id === savedSessionId) || fetchedActive || fetchedSessions[0] || null;
+        if (effectiveActive) localStorage.setItem('caci_selected_session_id', effectiveActive.id);
 
         setMembers(fetchedMembers);
         setContributions(fetchedFinances);
@@ -196,67 +208,60 @@ export const App: React.FC = () => {
         return;
       }
 
-      // Non-finance roles
       const [fetchedSessions, fetchedActive, fetchedMembers, fetchedDepts] = await Promise.all([
-        api.getSessions().catch(() => []),
-        api.getActiveSession().catch(() => null),
-        api.getMembers().catch(() => []),
-        api.getDepartments().catch(() => [])
+        requestOrFallback('service sessions', api.getSessions(), [] as ServiceSession[]),
+        requestOrFallback('active service', api.getActiveSession(), null),
+        requestOrFallback('members', api.getMembers(), [] as Member[]),
+        requestOrFallback('departments', api.getDepartments(), [] as Department[])
       ]);
 
       const savedSessionId = localStorage.getItem('caci_selected_session_id');
-      let effectiveActive = fetchedSessions.find((s) => s.id === savedSessionId);
-      if (!effectiveActive) {
-        effectiveActive = fetchedActive || fetchedSessions[0] || null;
-      }
-      if (effectiveActive) {
-        localStorage.setItem('caci_selected_session_id', effectiveActive.id);
-      }
+      const effectiveActive = fetchedSessions.find((s) => s.id === savedSessionId) || fetchedActive || fetchedSessions[0] || null;
+      if (effectiveActive) localStorage.setItem('caci_selected_session_id', effectiveActive.id);
 
       setSessions(fetchedSessions);
       setActiveSession(effectiveActive);
       setMembers(fetchedMembers);
       setDepartments(fetchedDepts);
 
-      if (effectiveActive) {
-        if (role === 'CELL_LEADER') {
-          // Cell Leader only needs attendance records and stats
-          const [attRecords, attStats] = await Promise.all([
-            api.getSessionAttendance(effectiveActive.id).catch(() => []),
-            api.getAttendanceStats(effectiveActive.id).catch(() => null)
-          ]);
-          setAttendanceRecords(attRecords);
-          setStats(attStats);
-          setContributions([]);
-          setFinancialSummary(null);
-          setMessageLogs([]);
-          setTodayCelebrantsCount(0);
-        } else {
-          // Admin & Media Team
-          const [attRecords, attStats, fetchedFinances, finSummary, msgs, celData] = await Promise.all([
-            api.getSessionAttendance(effectiveActive.id).catch(() => []),
-            api.getAttendanceStats(effectiveActive.id).catch(() => null),
-            role === 'ADMIN' ? api.getFinances().catch(() => []) : Promise.resolve([]),
-            role === 'ADMIN' ? api.getFinancialSummary().catch(() => null) : Promise.resolve(null),
-            api.getMessageLogs().catch(() => []),
-            api.getTodayCelebrants().catch(() => [])
-          ]);
+      if (effectiveActive && role === 'CELL_LEADER') {
+        const [attRecords, attStats] = await Promise.all([
+          requestOrFallback('attendance records', api.getSessionAttendance(effectiveActive.id), [] as AttendanceRecord[]),
+          requestOrFallback('attendance summary', api.getAttendanceStats(effectiveActive.id), null)
+        ]);
+        setAttendanceRecords(attRecords);
+        setStats(attStats);
+        setContributions([]);
+        setFinancialSummary(null);
+        setMessageLogs([]);
+        setTodayCelebrantsCount(0);
+      } else if (effectiveActive) {
+        const [attRecords, attStats, fetchedFinances, finSummary, msgs, celData] = await Promise.all([
+          requestOrFallback('attendance records', api.getSessionAttendance(effectiveActive.id), [] as AttendanceRecord[]),
+          requestOrFallback('attendance summary', api.getAttendanceStats(effectiveActive.id), null),
+          role === 'ADMIN' ? requestOrFallback('contributions', api.getFinances(), [] as FinancialContribution[]) : Promise.resolve([] as FinancialContribution[]),
+          role === 'ADMIN' ? requestOrFallback('financial summary', api.getFinancialSummary(), null) : Promise.resolve(null),
+          requestOrFallback('message history', api.getMessageLogs(), [] as MessageLog[]),
+          requestOrFallback('celebrations', api.getTodayCelebrants(), [] as any[])
+        ]);
 
-          setAttendanceRecords(attRecords);
-          setStats(attStats);
-          setContributions(fetchedFinances);
-          setFinancialSummary(finSummary);
-          setMessageLogs(msgs);
-          setTodayCelebrantsCount(Array.isArray(celData) ? celData.length : 0);
-        }
+        setAttendanceRecords(attRecords);
+        setStats(attStats);
+        setContributions(fetchedFinances);
+        setFinancialSummary(finSummary);
+        setMessageLogs(msgs);
+        setTodayCelebrantsCount(Array.isArray(celData) ? celData.length : 0);
       } else {
+        setAttendanceRecords([]);
+        setStats(null);
         if (role === 'ADMIN' || role === 'MEDIA_TEAM') {
-          const celData = await api.getTodayCelebrants().catch(() => []);
+          const celData = await requestOrFallback('celebrations', api.getTodayCelebrants(), [] as any[]);
           setTodayCelebrantsCount(Array.isArray(celData) ? celData.length : 0);
         }
       }
-    } catch (err) {
-      console.error('Failed loading church data:', err);
+    } catch (error) {
+      console.error('Failed loading church data:', error);
+      setDataLoadFailures((previous) => previous.includes('workspace data') ? previous : [...previous, 'workspace data']);
     } finally {
       setIsLoading(false);
     }
@@ -273,18 +278,19 @@ export const App: React.FC = () => {
 
   // Session selection handler
   const handleSelectSession = async (session: ServiceSession) => {
-    setActiveSession(session);
-    localStorage.setItem('caci_selected_session_id', session.id);
     try {
       const [attRecords, attStats] = await Promise.all([
         api.getSessionAttendance(session.id),
         api.getAttendanceStats(session.id)
       ]);
+      setActiveSession(session);
+      localStorage.setItem('caci_selected_session_id', session.id);
       setAttendanceRecords(attRecords);
       setStats(attStats);
       showToast(`Active: ${session.serviceType} (${new Date(session.serviceDate).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })})`);
     } catch (err) {
       console.error(err);
+      showToast('Could not load this service’s attendance. Please try again.', 'error');
     }
   };
 
@@ -300,25 +306,22 @@ export const App: React.FC = () => {
         });
       }
 
-      setSessions((prev) => {
-        if (session && !prev.some((s) => s.id === session.id)) {
-          return [session, ...prev];
-        }
-        return prev;
-      });
-
-      setActiveSession(session);
-      localStorage.setItem('caci_selected_session_id', session.id);
-
       const [attRecords, attStats] = await Promise.all([
         api.getSessionAttendance(session.id),
         api.getAttendanceStats(session.id)
       ]);
+      setSessions((prev) => {
+        if (!prev.some((s) => s.id === session.id)) return [session, ...prev];
+        return prev;
+      });
+      setActiveSession(session);
+      localStorage.setItem('caci_selected_session_id', session.id);
       setAttendanceRecords(attRecords);
       setStats(attStats);
       showToast(`Switched to: ${session.serviceType} (${new Date(session.serviceDate).toLocaleDateString()})`);
     } catch (err: any) {
       console.error('Error switching date:', err);
+      showToast(err.message || 'Could not switch to that service date. Please try again.', 'error');
     }
   };
 
@@ -344,7 +347,7 @@ export const App: React.FC = () => {
       });
       showToast(`Created & selected: ${newSession.serviceType}`);
     } catch (err: any) {
-      alert(err.message || 'Failed to create session');
+      showToast(err.message || 'Failed to create service session.', 'error');
     }
   };
 
@@ -448,7 +451,14 @@ export const App: React.FC = () => {
   // Undo Check-In handler
   const handleUndoCheckIn = async (memberId: string) => {
     if (!activeSession) return;
+    if (!isOnline) {
+      const message = 'Reconnect to the internet before undoing a check-in.';
+      showToast(message, 'error');
+      throw new Error(message);
+    }
     const member = members.find((m) => m.id === memberId);
+    const previousRecords = attendanceRecords;
+    const previousStats = stats;
 
     setAttendanceRecords((prev) => prev.filter((r) => r.memberId !== memberId));
 
@@ -475,12 +485,15 @@ export const App: React.FC = () => {
       });
     }
 
-    if (isOnline) {
-      try {
-        await api.undoCheckIn(activeSession.id, memberId);
-      } catch (err) {
-        console.error(err);
-      }
+    try {
+      await api.undoCheckIn(activeSession.id, memberId);
+    } catch (err: any) {
+      console.error('Could not undo attendance:', err);
+      setAttendanceRecords(previousRecords);
+      setStats(previousStats);
+      const message = err.message || 'Could not undo check-in. Please try again.';
+      showToast(message, 'error');
+      throw err;
     }
     showToast(`Undone check-in for ${member?.firstName || 'member'}`);
   };
@@ -490,10 +503,10 @@ export const App: React.FC = () => {
     if (!activeSession) return;
     try {
       if (!isOnline) {
-        showToast('Attendance recorded offline. Will sync when reconnected.');
+        showToast('Attendance is queued offline and will sync when reconnected.', 'info');
         return;
       }
-      await offlineSync.syncQueuedData().catch(() => {});
+      await offlineSync.syncQueuedData();
       const [recs, st] = await Promise.all([
         api.getSessionAttendance(activeSession.id),
         api.getAttendanceStats(activeSession.id)
@@ -503,7 +516,7 @@ export const App: React.FC = () => {
       showToast(`Attendance for ${activeSession.serviceType} saved permanently!`);
     } catch (err: any) {
       console.error('Error saving attendance:', err);
-      showToast(`Saved locally. ${err.message || ''}`);
+      showToast(err.message || 'Could not refresh attendance. Your offline queue is unchanged.', 'error');
     }
   };
 
@@ -526,7 +539,7 @@ export const App: React.FC = () => {
         setFinancialSummary(fsum);
       }
     } catch (err: any) {
-      alert(err.message || 'Sync failed');
+      showToast(err.message || 'Could not complete sync or refresh. Check the queue status before retrying.', 'error');
     } finally {
       setIsSyncing(false);
     }
@@ -633,7 +646,17 @@ export const App: React.FC = () => {
 
       {/* Toast Notification */}
       {toastMessage && (
-        <div className="fixed bottom-6 right-6 z-50 bg-slate-900 text-white px-5 py-3 rounded-2xl shadow-2xl border border-slate-700 font-bold text-xs animate-in slide-in-from-bottom-4 duration-300 flex items-center space-x-2">
+        <div
+          role={toastTone === 'error' ? 'alert' : 'status'}
+          aria-live={toastTone === 'error' ? 'assertive' : 'polite'}
+          className={`fixed bottom-24 left-4 right-4 z-50 mx-auto max-w-xl px-5 py-3 rounded-2xl shadow-2xl border font-bold text-sm animate-in slide-in-from-bottom-4 duration-300 flex items-center justify-center md:bottom-6 md:left-auto md:right-6 md:mx-0 md:justify-start ${
+            toastTone === 'error'
+              ? 'bg-rose-950 text-rose-50 border-rose-700'
+              : toastTone === 'info'
+              ? 'bg-blue-950 text-blue-50 border-blue-700'
+              : 'bg-slate-900 text-white border-slate-700'
+          }`}
+        >
           <span>{toastMessage}</span>
         </div>
       )}
@@ -668,11 +691,11 @@ export const App: React.FC = () => {
 
       {/* Developer Impersonation Active Banner */}
       {isDeveloper && developerPreviewRole && (
-        <div className="bg-gradient-to-r from-amber-600 via-purple-600 to-indigo-600 text-white px-4 sm:px-8 py-2.5 text-xs font-bold flex flex-wrap items-center justify-between gap-2 shadow-md">
+        <div role="status" className="bg-gradient-to-r from-amber-700 via-purple-700 to-indigo-700 text-white px-4 sm:px-8 py-2.5 text-xs font-bold flex flex-wrap items-center justify-between gap-2 shadow-md">
           <div className="flex items-center space-x-2">
             <span className="p-1 rounded bg-black/20 text-white">🛠️</span>
-            <span>
-              Developer Impersonation Active: You are currently viewing the system as{' '}
+            <span className="leading-relaxed">
+              Developer Preview (UI only). Your authenticated account remains DEVELOPER; API requests are not made as{' '}
               <strong className="underline uppercase tracking-wide">
                 {developerPreviewRole.replace('_', ' ')}
                 {developerPreviewCell ? ` (${developerPreviewCell} Cell)` : ''}
@@ -686,17 +709,32 @@ export const App: React.FC = () => {
             }}
             className="px-3 py-1 bg-white text-slate-900 rounded-xl text-[11px] font-extrabold hover:bg-slate-100 transition shadow-sm cursor-pointer"
           >
-            Exit Preview (Return to Full Developer Access)
+            Exit Preview
           </button>
         </div>
       )}
 
       {/* Main Workspace Body */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
+      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 pb-28 md:pb-6">
+        {dataLoadFailures.length > 0 && !isLoading && (
+          <div role="alert" className="mb-5 flex flex-col gap-3 rounded-2xl border border-amber-300 bg-amber-50 p-4 text-amber-950 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="font-bold">Some information could not be loaded.</p>
+              <p className="mt-1 text-sm">Unavailable: {dataLoadFailures.join(', ')}. Other parts of the app are still available.</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => void loadData()}
+              className="min-h-[44px] shrink-0 rounded-xl bg-amber-900 px-4 py-2 text-sm font-bold text-white hover:bg-amber-800"
+            >
+              Try again
+            </button>
+          </div>
+        )}
         {isLoading ? (
-          <div className="py-24 text-center text-slate-400 space-y-3">
-            <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto"></div>
-            <p className="text-xs font-semibold">Loading CACI Church Platform...</p>
+          <div role="status" aria-live="polite" className="py-24 text-center text-slate-500 space-y-3">
+            <div className="w-9 h-9 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto"></div>
+            <p className="text-sm font-semibold">Getting your workspace ready…</p>
           </div>
         ) : (
           <>

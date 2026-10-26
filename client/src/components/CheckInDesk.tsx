@@ -68,8 +68,11 @@ export const CheckInDesk: React.FC<CheckInDeskProps> = ({
   const [isSavingAttendance, setIsSavingAttendance] = useState(false);
   const [attendanceSavedAt, setAttendanceSavedAt] = useState<string | null>(null);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [pendingMemberIds, setPendingMemberIds] = useState<Set<string>>(new Set());
+  const [actionError, setActionError] = useState<string | null>(null);
 
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const pendingMemberIdsRef = useRef<Set<string>>(new Set());
 
   // Sync groupFilter if user cell changes
   useEffect(() => {
@@ -136,6 +139,14 @@ export const CheckInDesk: React.FC<CheckInDeskProps> = ({
     return true;
   });
 
+  const countableMembers = members.filter((member) => {
+    if (groupFilter !== 'ALL' && member.churchGroup !== groupFilter) return false;
+    if (selectedDeptId !== 'ALL' && !member.departments?.some((d) => d.departmentId === selectedDeptId)) return false;
+    return true;
+  });
+  const scopedPresentCount = countableMembers.filter((member) => checkedInIds.has(member.id)).length;
+  const scopedAbsentCount = Math.max(0, countableMembers.length - scopedPresentCount);
+
   const handleSearchKeyDown = async (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter' && filteredMembers.length > 0) {
       e.preventDefault();
@@ -153,17 +164,31 @@ export const CheckInDesk: React.FC<CheckInDeskProps> = ({
   };
 
   const handleMemberAction = async (memberId: string) => {
-    setHasUnsavedChanges(true);
-    const isAlreadyPresent = checkedInIds.has(memberId);
-    if (!isAlreadyPresent) {
-      if (soundEnabled) playCheckInChime();
-      await onCheckIn(memberId);
-
-      if (attendanceRecords.length + 1 === 50 || attendanceRecords.length + 1 === 100) {
-        confetti({ particleCount: 80, spread: 60, origin: { y: 0.7 } });
+    if (pendingMemberIdsRef.current.has(memberId)) return;
+    const alreadyPresent = checkedInIds.has(memberId);
+    setActionError(null);
+    pendingMemberIdsRef.current.add(memberId);
+    setPendingMemberIds((previous) => new Set(previous).add(memberId));
+    try {
+      if (!alreadyPresent) {
+        await onCheckIn(memberId);
+        if (soundEnabled) playCheckInChime();
+        if (attendanceRecords.length + 1 === 50 || attendanceRecords.length + 1 === 100) {
+          confetti({ particleCount: 80, spread: 60, origin: { y: 0.7 } });
+        }
+      } else {
+        await onUndoCheckIn(memberId);
       }
-    } else {
-      await onUndoCheckIn(memberId);
+      setHasUnsavedChanges(true);
+    } catch (error) {
+      setActionError(error instanceof Error ? error.message : 'Could not update attendance. Please try again.');
+    } finally {
+      pendingMemberIdsRef.current.delete(memberId);
+      setPendingMemberIds((previous) => {
+        const next = new Set(previous);
+        next.delete(memberId);
+        return next;
+      });
     }
   };
 
@@ -466,35 +491,45 @@ export const CheckInDesk: React.FC<CheckInDeskProps> = ({
 
       {/* 2. Rapid Check-In Control Bar */}
       <div className="bg-white p-5 rounded-3xl shadow-sm border border-slate-200 space-y-4">
+        {actionError && (
+          <div role="alert" className="flex items-center justify-between gap-3 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800">
+            <span>{actionError}</span>
+            <button type="button" onClick={() => setActionError(null)} className="shrink-0 rounded-lg px-3 py-2 font-bold hover:bg-rose-100">Dismiss</button>
+          </div>
+        )}
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
           <div className="relative flex-1 flex items-center">
             <Search className="w-5 h-5 text-slate-400 absolute left-4" />
             <input
               ref={searchInputRef}
               type="text"
-              placeholder="Type name, phone, or ID (e.g. Kwame, CACI-001)... [Press Enter to check in, '/' to search]"
+              aria-label="Search members by name, phone, or member ID"
+              placeholder="Search name, phone, or member ID…"
               value={searchTerm}
               onChange={(e) => {
                 setSearchTerm(e.target.value);
                 setSelectedIndex(0);
               }}
               onKeyDown={handleSearchKeyDown}
-              className="w-full pl-11 pr-28 py-3.5 bg-slate-50 hover:bg-slate-100/60 focus:bg-white border-2 border-slate-200 focus:border-blue-600 rounded-2xl text-slate-900 text-base font-semibold placeholder-slate-400 focus:outline-none focus:ring-4 focus:ring-blue-100 transition shadow-inner"
+              className="min-h-[52px] w-full pl-11 pr-28 py-3.5 bg-slate-50 hover:bg-slate-100/60 focus:bg-white border-2 border-slate-200 focus:border-blue-600 rounded-2xl text-slate-900 text-base font-semibold placeholder-slate-400 focus:outline-none focus:ring-4 focus:ring-blue-100 transition shadow-inner"
             />
 
             <div className="absolute right-3 flex items-center space-x-2">
               {searchTerm && (
                 <button
+                  type="button"
                   onClick={() => setSearchTerm('')}
-                  className="text-xs text-slate-400 hover:text-slate-600 font-bold px-2 py-1 rounded"
+                  className="min-h-[40px] text-xs text-slate-500 hover:text-slate-800 font-bold px-2 py-1 rounded"
                 >
                   Clear
                 </button>
               )}
 
               <button
+                type="button"
                 onClick={() => setSoundEnabled(!soundEnabled)}
                 title={soundEnabled ? 'Chime sound enabled' : 'Chime sound muted'}
+                aria-label={soundEnabled ? 'Mute check-in sound' : 'Enable check-in sound'}
                 className={`p-1.5 rounded-xl border transition ${
                   soundEnabled
                     ? 'bg-blue-50 border-blue-200 text-blue-700'
@@ -557,7 +592,7 @@ export const CheckInDesk: React.FC<CheckInDeskProps> = ({
                     : 'text-slate-600 hover:text-slate-900'
                 }`}
               >
-                All Cells <span className="text-[10px] text-slate-400 font-mono ml-1">[0]</span>
+                All Cells <span className="text-[10px] text-slate-400 font-mono ml-1">({members.length})</span>
               </button>
               <button
                 onClick={() => setGroupFilter('JOY')}
@@ -569,7 +604,7 @@ export const CheckInDesk: React.FC<CheckInDeskProps> = ({
               >
                 <span className="w-2 h-2 rounded-full bg-amber-500"></span>
                 <span>Joy</span>
-                <span className="text-[10px] font-mono ml-1 text-slate-400">[1]</span>
+                <span className="text-[10px] font-mono ml-1 text-slate-400">({members.filter((m) => m.churchGroup === 'JOY').length})</span>
               </button>
               <button
                 onClick={() => setGroupFilter('FAITH')}
@@ -581,7 +616,7 @@ export const CheckInDesk: React.FC<CheckInDeskProps> = ({
               >
                 <span className="w-2 h-2 rounded-full bg-blue-600"></span>
                 <span>Faith</span>
-                <span className="text-[10px] font-mono ml-1 text-slate-400">[2]</span>
+                <span className="text-[10px] font-mono ml-1 text-slate-400">({members.filter((m) => m.churchGroup === 'FAITH').length})</span>
               </button>
               <button
                 onClick={() => setGroupFilter('HOPE')}
@@ -593,7 +628,7 @@ export const CheckInDesk: React.FC<CheckInDeskProps> = ({
               >
                 <span className="w-2 h-2 rounded-full bg-emerald-600"></span>
                 <span>Hope</span>
-                <span className="text-[10px] font-mono ml-1 text-slate-400">[3]</span>
+                <span className="text-[10px] font-mono ml-1 text-slate-400">({members.filter((m) => m.churchGroup === 'HOPE').length})</span>
               </button>
               <button
                 onClick={() => setGroupFilter('LOVE')}
@@ -605,7 +640,7 @@ export const CheckInDesk: React.FC<CheckInDeskProps> = ({
               >
                 <span className="w-2 h-2 rounded-full bg-rose-600"></span>
                 <span>Love</span>
-                <span className="text-[10px] font-mono ml-1 text-slate-400">[4]</span>
+                <span className="text-[10px] font-mono ml-1 text-slate-400">({members.filter((m) => m.churchGroup === 'LOVE').length})</span>
               </button>
             </div>
           )}
@@ -628,7 +663,7 @@ export const CheckInDesk: React.FC<CheckInDeskProps> = ({
                   : 'text-emerald-700 hover:bg-emerald-50'
               }`}
             >
-              Present ({attendanceRecords.length})
+              Present ({scopedPresentCount})
             </button>
             <button
               onClick={() => setStatusFilter('ABSENT')}
@@ -638,7 +673,7 @@ export const CheckInDesk: React.FC<CheckInDeskProps> = ({
                   : 'text-slate-600 hover:bg-slate-200'
               }`}
             >
-              Absent ({Math.max(0, members.length - attendanceRecords.length)})
+              Absent ({scopedAbsentCount})
             </button>
           </div>
 
@@ -684,16 +719,16 @@ export const CheckInDesk: React.FC<CheckInDeskProps> = ({
               </p>
             </div>
           ) : (
-            <div className="space-y-2.5 max-h-[640px] overflow-y-auto pr-1">
+            <div className="space-y-2.5 pr-1 lg:max-h-[640px] lg:overflow-y-auto">
               {filteredMembers.map((member, idx) => {
                 const isPresent = checkedInIds.has(member.id);
+                const isPending = pendingMemberIds.has(member.id);
                 const isHighlighted = idx === selectedIndex && searchTerm.trim() !== '';
 
                 return (
                   <div
                     key={member.id}
-                    onClick={() => handleMemberAction(member.id)}
-                    className={`p-3.5 rounded-2xl border-2 transition-all flex items-center justify-between gap-4 cursor-pointer select-none ${
+                    className={`p-3.5 rounded-2xl border-2 transition-all flex items-center justify-between gap-3 select-none ${
                       isPresent
                         ? 'bg-emerald-50/70 border-emerald-300 shadow-sm'
                         : isHighlighted
@@ -702,7 +737,14 @@ export const CheckInDesk: React.FC<CheckInDeskProps> = ({
                     }`}
                   >
                     {/* Left: Avatar & Info */}
-                    <div className="flex items-center space-x-3.5 min-w-0">
+                    <button
+                      type="button"
+                      onClick={() => void handleMemberAction(member.id)}
+                      disabled={isPending}
+                      aria-pressed={isPresent}
+                      aria-label={`${isPresent ? 'Undo check-in for' : 'Check in'} ${member.firstName} ${member.lastName}`}
+                      className="flex min-w-0 flex-1 items-center space-x-3 rounded-xl text-left disabled:cursor-wait disabled:opacity-60"
+                    >
                       {member.photoUrl ? (
                         <img
                           src={member.photoUrl}
@@ -727,7 +769,7 @@ export const CheckInDesk: React.FC<CheckInDeskProps> = ({
                       )}
 
                       <div className="min-w-0">
-                        <div className="flex items-center space-x-2">
+                        <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
                           <h4 className="text-sm font-extrabold text-slate-900 truncate">
                             {member.firstName} {member.lastName}
                           </h4>
@@ -741,7 +783,7 @@ export const CheckInDesk: React.FC<CheckInDeskProps> = ({
                             {getCellLabel(member.churchGroup)}
                           </span>
 
-                          <span className="font-mono text-[10px] font-bold text-slate-400">
+                          <span className="hidden sm:inline font-mono text-[10px] font-bold text-slate-400">
                             {member.memberCode || 'CACI-000'}
                           </span>
                         </div>
@@ -760,44 +802,62 @@ export const CheckInDesk: React.FC<CheckInDeskProps> = ({
                           <span className="text-slate-600 font-medium">{member.role}</span>
                         </div>
                       </div>
-                    </div>
+                    </button>
 
                     {/* Right: Check-In Action Button */}
                     <div className="flex items-center space-x-1 shrink-0">
                       {onOpenEditMember && (
                         <button
+                          type="button"
                           onClick={(e) => {
                             e.stopPropagation();
                             onOpenEditMember(member);
                           }}
                           title="Edit Member Details"
-                          className="p-2 rounded-xl text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition cursor-pointer"
+                          aria-label={`Edit ${member.firstName} ${member.lastName}`}
+                          className="min-h-[44px] min-w-[44px] p-2 rounded-xl text-slate-500 hover:text-blue-600 hover:bg-blue-50 transition cursor-pointer"
                         >
                           <Edit2 className="w-4 h-4" />
                         </button>
                       )}
 
                       <button
+                        type="button"
                         onClick={(e) => {
                           e.stopPropagation();
                           onViewMemberHistory(member);
                         }}
                         title="View Attendance History"
-                        className="p-2 rounded-xl text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition cursor-pointer"
+                        aria-label={`View attendance history for ${member.firstName} ${member.lastName}`}
+                        className="min-h-[44px] min-w-[44px] p-2 rounded-xl text-slate-500 hover:text-blue-600 hover:bg-blue-50 transition cursor-pointer"
                       >
                         <History className="w-4 h-4" />
                       </button>
 
-                      {isPresent ? (
-                        <div className="flex items-center space-x-1.5 px-4 py-2 rounded-xl bg-emerald-600 text-white font-extrabold text-xs shadow-sm">
+                      {isPending ? (
+                        <button type="button" disabled className="min-h-[44px] px-3 rounded-xl bg-slate-200 text-slate-600 font-extrabold text-xs">
+                          Updating…
+                        </button>
+                      ) : isPresent ? (
+                        <button
+                          type="button"
+                          onClick={() => void handleMemberAction(member.id)}
+                          aria-label={`Undo check-in for ${member.firstName} ${member.lastName}`}
+                          className="min-h-[44px] flex items-center space-x-1.5 px-3 sm:px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs shadow-sm"
+                        >
                           <Check className="w-4 h-4" />
-                          <span>Present</span>
-                        </div>
+                          <span>Present · Undo</span>
+                        </button>
                       ) : (
-                        <div className="flex items-center space-x-1.5 px-4 py-2 rounded-xl bg-slate-100 group-hover:bg-blue-600 group-hover:text-white text-slate-700 font-extrabold text-xs transition">
+                        <button
+                          type="button"
+                          onClick={() => void handleMemberAction(member.id)}
+                          aria-label={`Check in ${member.firstName} ${member.lastName}`}
+                          className="min-h-[44px] flex items-center space-x-1.5 px-3 sm:px-4 py-2 rounded-xl bg-slate-100 hover:bg-blue-600 hover:text-white text-slate-700 font-extrabold text-xs transition"
+                        >
                           <span>Check In</span>
                           <ChevronRight className="w-4 h-4" />
-                        </div>
+                        </button>
                       )}
                     </div>
                   </div>
