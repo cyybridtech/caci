@@ -845,6 +845,7 @@ export const App: React.FC = () => {
         isOpen={isAddMemberOpen}
         mode="create"
         departments={departments}
+        existingMembers={members}
         onClose={() => setIsAddMemberOpen(false)}
         onSubmit={async (data) => {
           await handleAddMember(data);
@@ -858,6 +859,7 @@ export const App: React.FC = () => {
         mode="edit"
         initialMember={editingMember}
         departments={departments}
+        existingMembers={members}
         onClose={() => setEditingMember(null)}
         onSubmit={async (data) => {
           if (editingMember) {

@@ -35,7 +35,8 @@ export const MembersDirectory: React.FC<MembersDirectoryProps> = ({
   const { user } = useAuth();
   const isCellLeader = user?.role === 'CELL_LEADER';
   const assignedCell = isCellLeader ? user?.cell : null;
-  const canDelete = user?.role === 'ADMIN' || user?.role === 'DEVELOPER' || user?.role === 'CELL_LEADER' || user?.role === 'MEDIA_TEAM';
+  // BUG FIX: MEDIA_TEAM removed — they should NOT be able to permanently delete members
+  const canDelete = user?.role === 'ADMIN' || user?.role === 'DEVELOPER' || user?.role === 'CELL_LEADER';
 
   const [searchTerm, setSearchTerm] = useState('');
   const [groupFilter, setGroupFilter] = useState<'ALL' | 'JOY' | 'FAITH' | 'HOPE' | 'LOVE'>(
@@ -417,6 +418,7 @@ export const MembersDirectory: React.FC<MembersDirectoryProps> = ({
         mode={formModalState.mode}
         initialMember={formModalState.member}
         departments={departments}
+        existingMembers={members}
         onClose={() => setFormModalState({ isOpen: false, mode: 'create', member: null })}
         onSubmit={handleFormSubmit}
       />

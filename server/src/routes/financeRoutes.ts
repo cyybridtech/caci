@@ -54,7 +54,7 @@ financeRouter.get('/', async (req: Request, res: Response) => {
         }
       },
       orderBy: { transactionDate: 'desc' },
-      take: 200
+      take: 1000
     });
 
     res.json(records);
@@ -113,10 +113,24 @@ financeRouter.post('/', requireRole(UserRole.ADMIN, UserRole.FINANCE), async (re
   }
 });
 
-// GET /api/finances/summary - summary totals across 4 cells
+// GET /api/finances/summary - summary totals across 4 cells (supports optional startDate/endDate query params)
 financeRouter.get('/summary', async (req: Request, res: Response) => {
   try {
+    const { startDate, endDate } = req.query;
+
+    const whereClause: any = {};
+    if (startDate || endDate) {
+      whereClause.transactionDate = {};
+      if (startDate) whereClause.transactionDate.gte = new Date(startDate as string);
+      if (endDate) {
+        const end = new Date(endDate as string);
+        end.setHours(23, 59, 59, 999);
+        whereClause.transactionDate.lte = end;
+      }
+    }
+
     const allRecords = await prisma.financialContribution.findMany({
+      where: whereClause,
       include: {
         member: {
           select: { churchGroup: true }

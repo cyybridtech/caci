@@ -315,10 +315,21 @@ campaignRouter.post('/pledges/:pledgeId/payments', async (req: Request, res: Res
     });
 
     // Automatically record in General Church Financial Contribution Ledger
+    // Map the campaign's category to the correct FinancialCategory enum
+    const campaignToFinancialCategory: Record<string, FinancialCategory> = {
+      BUILDING_PROJECT: FinancialCategory.BUILDING_PROJECT,
+      ANNUAL_HARVEST: FinancialCategory.THANKSGIVING,
+      SPECIAL_SEED: FinancialCategory.SPECIAL_SEED,
+      WELFARE: FinancialCategory.WELFARE,
+      MISSIONS: FinancialCategory.OFFERING,
+    };
+    const ledgerCategory: FinancialCategory =
+      campaignToFinancialCategory[pledge.campaign.category] ?? FinancialCategory.OFFERING;
+
     await prisma.financialContribution.create({
       data: {
         memberId: pledge.memberId,
-        category: FinancialCategory.BUILDING_PROJECT,
+        category: ledgerCategory,
         amount: paymentAmount,
         paymentMethod: paymentMethod || PaymentMethod.CASH,
         notes: `Pledge Payment (${receiptNumber}) for campaign: ${pledge.campaign.title}`,

@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { X, User, UserPlus, Edit2, Camera, Image, CheckCircle, AlertCircle, Loader2, Building2 } from 'lucide-react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { X, User, UserPlus, Edit2, Camera, Image, CheckCircle, AlertCircle, Loader2, Building2, AlertTriangle, ShieldAlert } from 'lucide-react';
 import { Member, ChurchGroup, Gender, MemberStatus, MaritalStatus, Department } from '../types/index.ts';
 import { useAuth } from '../context/AuthContext.tsx';
 import { api } from '../services/api.ts';
@@ -9,6 +9,7 @@ interface MemberFormModalProps {
   mode: 'create' | 'edit';
   initialMember?: Member | null;
   departments?: Department[];
+  existingMembers?: Member[];
   onClose: () => void;
   onSubmit: (memberData: any) => Promise<void>;
 }
@@ -31,11 +32,43 @@ const formatDateForInput = (val?: string | Date | null): string => {
   }
 };
 
+export const normalizeGhanaPhone = (raw: string): string => {
+  if (!raw) return '';
+  const cleaned = raw.trim().replace(/[\s\-().]/g, '');
+  if (cleaned.startsWith('+233')) {
+    return '0' + cleaned.slice(4);
+  }
+  if (cleaned.startsWith('233') && cleaned.length >= 12) {
+    return '0' + cleaned.slice(3);
+  }
+  return cleaned;
+};
+
+export const validateGhanaPhoneFormat = (raw: string): { isValid: boolean; message?: string } => {
+  if (!raw || !raw.trim()) return { isValid: true };
+  const cleaned = normalizeGhanaPhone(raw);
+  const ghanaRegex = /^0(2[0-9]|5[0-9])\d{7}$/;
+  if (cleaned.length !== 10) {
+    return {
+      isValid: false,
+      message: `Phone number has ${cleaned.length} digits. Ghana numbers must be exactly 10 digits (e.g. 0241234567).`
+    };
+  }
+  if (!ghanaRegex.test(cleaned)) {
+    return {
+      isValid: false,
+      message: `Invalid Ghana network prefix. Valid prefixes begin with 02 or 05 (e.g. 024, 054, 055, 050, 020).`
+    };
+  }
+  return { isValid: true };
+};
+
 export const MemberFormModal: React.FC<MemberFormModalProps> = ({
   isOpen,
   mode,
   initialMember,
   departments,
+  existingMembers,
   onClose,
   onSubmit
 }) => {
@@ -69,6 +102,39 @@ export const MemberFormModal: React.FC<MemberFormModalProps> = ({
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  // Live duplicate checks against existing members
+  const duplicateNameMember = useMemo(() => {
+    if (!existingMembers || !firstName.trim() || !lastName.trim()) return null;
+    const f = firstName.trim().toLowerCase();
+    const l = lastName.trim().toLowerCase();
+    return (
+      existingMembers.find(
+        (m) =>
+          m.id !== initialMember?.id &&
+          m.firstName.trim().toLowerCase() === f &&
+          m.lastName.trim().toLowerCase() === l
+      ) || null
+    );
+  }, [existingMembers, firstName, lastName, initialMember]);
+
+  const phoneValidation = useMemo(() => {
+    return validateGhanaPhoneFormat(phone);
+  }, [phone]);
+
+  const duplicatePhoneMember = useMemo(() => {
+    if (!existingMembers || !phone.trim()) return null;
+    const clean = normalizeGhanaPhone(phone);
+    if (!clean || clean.length < 9) return null;
+    return (
+      existingMembers.find(
+        (m) =>
+          m.id !== initialMember?.id &&
+          m.phone &&
+          normalizeGhanaPhone(m.phone) === clean
+      ) || null
+    );
+  }, [existingMembers, phone, initialMember]);
 
   useEffect(() => {
     if (departments && departments.length > 0) {
@@ -157,6 +223,28 @@ export const MemberFormModal: React.FC<MemberFormModalProps> = ({
       return;
     }
 
+    if (phone.trim()) {
+      const v = validateGhanaPhoneFormat(phone);
+      if (!v.isValid) {
+        setErrorMessage(v.message || 'Invalid Ghana phone number.');
+        return;
+      }
+    }
+
+    if (duplicatePhoneMember) {
+      setErrorMessage(
+        `🚨 HIGH ALERT: Phone number "${phone.trim()}" is already assigned to ${duplicatePhoneMember.firstName} ${duplicatePhoneMember.lastName} (${duplicatePhoneMember.memberCode || 'CACI'}, ${duplicatePhoneMember.churchGroup} Cell). Duplicate phone numbers are strictly prohibited.`
+      );
+      return;
+    }
+
+    if (duplicateNameMember && mode === 'create') {
+      setErrorMessage(
+        `🚨 HIGH ALERT: Duplicate congregant record! A member named "${firstName.trim()} ${lastName.trim()}" is already registered (${duplicateNameMember.memberCode || 'CACI'}, ${duplicateNameMember.churchGroup} Cell). Please check the directory.`
+      );
+      return;
+    }
+
     try {
       setIsSubmitting(true);
       setErrorMessage(null);
@@ -165,7 +253,7 @@ export const MemberFormModal: React.FC<MemberFormModalProps> = ({
         firstName: firstName.trim(),
         lastName: lastName.trim(),
         photoUrl: photoUrl.trim() || null,
-        phone: phone.trim() || null,
+        phone: phone.trim() ? normalizeGhanaPhone(phone) : null,
         email: email.trim() || null,
         gender,
         maritalStatus,
@@ -239,6 +327,42 @@ export const MemberFormModal: React.FC<MemberFormModalProps> = ({
           </div>
         )}
 
+        {/* HIGH ALERT: Duplicate Member Name */}
+        {duplicateNameMember && (
+          <div className="mx-6 mt-4 p-3.5 bg-rose-50 border-2 border-rose-500 rounded-2xl flex items-start space-x-3 text-rose-950 animate-pulse">
+            <ShieldAlert className="w-5 h-5 text-rose-600 shrink-0 mt-0.5" />
+            <div className="space-y-1 text-xs">
+              <div className="font-extrabold uppercase tracking-wide text-rose-700 flex items-center space-x-1.5">
+                <span>⚠️ High Alert: Potential Duplicate Member</span>
+              </div>
+              <p className="font-semibold text-rose-900 leading-relaxed">
+                A congregant named <span className="font-bold underline">{duplicateNameMember.firstName} {duplicateNameMember.lastName}</span> is already registered in the system ({duplicateNameMember.memberCode || 'CACI'}, {duplicateNameMember.churchGroup} Cell).
+              </p>
+              <p className="text-[11px] text-rose-800">
+                To prevent duplicate records and skewed attendance tracking, please check whether this member already exists.
+              </p>
+            </div>
+          </div>
+        )}
+
+        {/* HIGH ALERT: Duplicate Phone Number */}
+        {duplicatePhoneMember && (
+          <div className="mx-6 mt-3 p-3.5 bg-amber-50 border-2 border-amber-500 rounded-2xl flex items-start space-x-3 text-amber-950">
+            <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+            <div className="space-y-1 text-xs">
+              <div className="font-extrabold uppercase tracking-wide text-amber-800 flex items-center space-x-1.5">
+                <span>⚠️ High Alert: Duplicate Phone Number</span>
+              </div>
+              <p className="font-semibold text-amber-900 leading-relaxed">
+                Phone number <span className="font-mono font-bold">{phone.trim()}</span> is already assigned to <span className="font-bold">{duplicatePhoneMember.firstName} {duplicatePhoneMember.lastName}</span> ({duplicatePhoneMember.memberCode || 'CACI'}, {duplicatePhoneMember.churchGroup} Cell).
+              </p>
+              <p className="text-[11px] text-amber-800">
+                Each member must have a unique phone number for SMS deliveries, broadcast messaging, and WhatsApp integration.
+              </p>
+            </div>
+          </div>
+        )}
+
         {/* Form Body */}
         <form onSubmit={handleSubmit} className="p-6 overflow-y-auto space-y-4">
           {/* Photo */}
@@ -292,25 +416,47 @@ export const MemberFormModal: React.FC<MemberFormModalProps> = ({
           {/* First & Last Name */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">First Name *</label>
+              <div className="flex items-center justify-between mb-1">
+                <label className="block text-xs font-bold text-slate-700">First Name *</label>
+                {duplicateNameMember && (
+                  <span className="text-[10px] font-bold text-rose-600 bg-rose-50 px-1.5 py-0.5 rounded border border-rose-200">
+                    Duplicate Name
+                  </span>
+                )}
+              </div>
               <input
                 type="text"
                 required
                 placeholder="e.g. Kwame"
                 value={firstName}
                 onChange={(e) => setFirstName(e.target.value)}
-                className="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs font-semibold focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                className={`w-full px-3 py-2 border rounded-xl text-xs font-semibold focus:outline-none transition ${
+                  duplicateNameMember
+                    ? 'border-rose-400 ring-2 ring-rose-300 bg-rose-50/30'
+                    : 'border-slate-300 focus:ring-2 focus:ring-blue-500'
+                }`}
               />
             </div>
             <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">Last Name *</label>
+              <div className="flex items-center justify-between mb-1">
+                <label className="block text-xs font-bold text-slate-700">Last Name *</label>
+                {duplicateNameMember && (
+                  <span className="text-[10px] font-bold text-rose-600 bg-rose-50 px-1.5 py-0.5 rounded border border-rose-200">
+                    Exists: {duplicateNameMember.memberCode || 'CACI'}
+                  </span>
+                )}
+              </div>
               <input
                 type="text"
                 required
                 placeholder="e.g. Mensah"
                 value={lastName}
                 onChange={(e) => setLastName(e.target.value)}
-                className="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs font-semibold focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                className={`w-full px-3 py-2 border rounded-xl text-xs font-semibold focus:outline-none transition ${
+                  duplicateNameMember
+                    ? 'border-rose-400 ring-2 ring-rose-300 bg-rose-50/30'
+                    : 'border-slate-300 focus:ring-2 focus:ring-blue-500'
+                }`}
               />
             </div>
           </div>
@@ -318,14 +464,51 @@ export const MemberFormModal: React.FC<MemberFormModalProps> = ({
           {/* Contact (Phone & Email) */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">Phone Number</label>
+              <div className="flex items-center justify-between mb-1">
+                <label className="block text-xs font-bold text-slate-700">Phone Number</label>
+                {phone.trim() && (
+                  <span>
+                    {duplicatePhoneMember ? (
+                      <span className="text-[10px] font-bold text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-300">
+                        Duplicate Phone
+                      </span>
+                    ) : phoneValidation.isValid ? (
+                      <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200 flex items-center space-x-1">
+                        <span>✓ Valid Ghana Number</span>
+                      </span>
+                    ) : (
+                      <span className="text-[10px] font-bold text-rose-600 bg-rose-50 px-1.5 py-0.5 rounded border border-rose-200">
+                        Invalid Format
+                      </span>
+                    )}
+                  </span>
+                )}
+              </div>
               <input
                 type="tel"
-                placeholder="e.g. +233 24 123 4567"
+                placeholder="e.g. 0241234567 or +233241234567"
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
-                className="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs font-semibold focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                className={`w-full px-3 py-2 border rounded-xl text-xs font-semibold focus:outline-none transition ${
+                  duplicatePhoneMember
+                    ? 'border-amber-500 ring-2 ring-amber-300 bg-amber-50/30'
+                    : phone.trim() && !phoneValidation.isValid
+                    ? 'border-rose-400 ring-2 ring-rose-300 bg-rose-50/30'
+                    : phone.trim() && phoneValidation.isValid
+                    ? 'border-emerald-400 ring-1 ring-emerald-300 bg-emerald-50/10'
+                    : 'border-slate-300 focus:ring-2 focus:ring-blue-500'
+                }`}
               />
+              {phone.trim() && !phoneValidation.isValid && (
+                <p className="mt-1 text-[11px] font-medium text-rose-600">
+                  {phoneValidation.message}
+                </p>
+              )}
+              {duplicatePhoneMember && (
+                <p className="mt-1 text-[11px] font-semibold text-amber-700">
+                  Assigned to {duplicatePhoneMember.firstName} {duplicatePhoneMember.lastName} ({duplicatePhoneMember.churchGroup} Cell)
+                </p>
+              )}
             </div>
             <div>
               <label className="block text-xs font-bold text-slate-700 mb-1">Email Address</label>

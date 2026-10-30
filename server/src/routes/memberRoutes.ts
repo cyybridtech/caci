@@ -290,6 +290,55 @@ memberRouter.post('/', async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'First name and last name are required' });
     }
 
+    // ── Phone validation: must be a valid 10-digit Ghana number ─────────────
+    if (phone && phone.trim()) {
+      const normalised = phone.trim().replace(/[\s\-().]/g, '');
+      // Accept 0XX or +233XX (strip to 10 digits starting with 0)
+      const local = normalised.startsWith('+233')
+        ? '0' + normalised.slice(4)
+        : normalised.startsWith('233')
+        ? '0' + normalised.slice(3)
+        : normalised;
+      const ghanaRegex = /^0(2[0-9]|5[0-9])\d{7}$/;
+      if (!ghanaRegex.test(local)) {
+        return res.status(400).json({
+          error: `Invalid phone number "${phone.trim()}". Please enter a valid 10-digit Ghana number (e.g. 0241234567).`
+        });
+      }
+    }
+
+    // ── Duplicate phone detection ────────────────────────────────────────────
+    if (phone && phone.trim()) {
+      const cleanPhone = phone.trim();
+      const duplicate = await prisma.member.findFirst({
+        where: { phone: cleanPhone },
+        select: { id: true, firstName: true, lastName: true, memberCode: true }
+      });
+      if (duplicate) {
+        return res.status(409).json({
+          error: `Phone number ${cleanPhone} is already registered to ${duplicate.firstName} ${duplicate.lastName} (${duplicate.memberCode || 'CACI'}).`,
+          code: 'DUPLICATE_PHONE',
+          existingMember: duplicate
+        });
+      }
+    }
+
+    // ── Duplicate member detection (same full name) ──────────────────────────
+    const existingByName = await prisma.member.findFirst({
+      where: {
+        firstName: { equals: firstName.trim() },
+        lastName: { equals: lastName.trim() }
+      },
+      select: { id: true, firstName: true, lastName: true, memberCode: true, churchGroup: true }
+    });
+    if (existingByName) {
+      return res.status(409).json({
+        error: `A member named "${firstName.trim()} ${lastName.trim()}" already exists (${existingByName.memberCode || 'CACI'}, ${existingByName.churchGroup} Cell). Please check the directory before adding a duplicate.`,
+        code: 'DUPLICATE_MEMBER',
+        existingMember: existingByName
+      });
+    }
+
     // Cell leader forces member into their own cell
     let targetCell: ChurchGroup = ChurchGroup.JOY;
     if (currentUser.role === UserRole.CELL_LEADER) {
@@ -409,6 +458,59 @@ memberRouter.put('/:id', async (req: Request, res: Response) => {
       invitedBy,
       notes
     } = req.body;
+
+    // ── Phone validation on update ─────────────────────────────────────────────
+    if (phone !== undefined && phone !== null && phone.trim() !== '') {
+      const normalised = phone.trim().replace(/[\s\-().]/g, '');
+      const local = normalised.startsWith('+233')
+        ? '0' + normalised.slice(4)
+        : normalised.startsWith('233')
+        ? '0' + normalised.slice(3)
+        : normalised;
+      const ghanaRegex = /^0(2[0-9]|5[0-9])\d{7}$/;
+      if (!ghanaRegex.test(local)) {
+        return res.status(400).json({
+          error: `Invalid phone number "${phone.trim()}". Please enter a valid 10-digit Ghana number (e.g. 0241234567).`
+        });
+      }
+
+      // Check duplicate phone (excluding this member)
+      const duplicatePhone = await prisma.member.findFirst({
+        where: {
+          phone: phone.trim(),
+          NOT: { id }
+        },
+        select: { id: true, firstName: true, lastName: true, memberCode: true }
+      });
+      if (duplicatePhone) {
+        return res.status(409).json({
+          error: `Phone number ${phone.trim()} is already assigned to ${duplicatePhone.firstName} ${duplicatePhone.lastName} (${duplicatePhone.memberCode || 'CACI'}).`,
+          code: 'DUPLICATE_PHONE',
+          existingMember: duplicatePhone
+        });
+      }
+    }
+
+    // ── Duplicate member name check on update (excluding this member) ────────
+    const targetFirst = firstName ? firstName.trim() : existing.firstName;
+    const targetLast = lastName ? lastName.trim() : existing.lastName;
+    if (firstName || lastName) {
+      const duplicateName = await prisma.member.findFirst({
+        where: {
+          firstName: { equals: targetFirst },
+          lastName: { equals: targetLast },
+          NOT: { id }
+        },
+        select: { id: true, firstName: true, lastName: true, memberCode: true, churchGroup: true }
+      });
+      if (duplicateName) {
+        return res.status(409).json({
+          error: `A member named "${targetFirst} ${targetLast}" already exists (${duplicateName.memberCode || 'CACI'}, ${duplicateName.churchGroup} Cell).`,
+          code: 'DUPLICATE_MEMBER',
+          existingMember: duplicateName
+        });
+      }
+    }
 
     let targetCell = undefined;
     if ((currentUser.role === UserRole.ADMIN || currentUser.role === UserRole.MEDIA_TEAM || currentUser.role === UserRole.DEVELOPER) && churchGroup && ['JOY', 'FAITH', 'HOPE', 'LOVE'].includes(churchGroup)) {
@@ -568,15 +670,11 @@ memberRouter.patch('/:id/assimilation', async (req: Request, res: Response) => {
 });
 
 
-// DELETE /api/members/:id
-memberRouter.delete('/:id', async (req: Request, res: Response) => {
+// DELETE /api/members/:id - restricted to ADMIN and DEVELOPER only
+memberRouter.delete('/:id', requireRole(UserRole.ADMIN, UserRole.DEVELOPER, UserRole.CELL_LEADER), async (req: Request, res: Response) => {
   try {
     const id = req.params.id as string;
     const currentUser = req.user!;
-
-    if (currentUser.role === UserRole.FINANCE) {
-      return res.status(403).json({ error: 'Unauthorized to delete members' });
-    }
 
     const member = await prisma.member.findUnique({ where: { id } });
     if (!member) {
