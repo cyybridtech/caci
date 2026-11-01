@@ -249,6 +249,7 @@ export interface FinancialContribution {
     firstName: string;
     lastName: string;
     phone: string | null;
+    memberCode?: string | null;
     churchGroup: ChurchGroup;
   } | null;
   session?: {
@@ -274,6 +275,47 @@ export interface FinancialSummary {
     generalOfferings: number;
   };
   recordCount: number;
+}
+
+export interface ServiceFinancialAuditRecord {
+  session: {
+    id: string;
+    serviceDate: string;
+    serviceType: string;
+    theme: string | null;
+    notes: string | null;
+    createdAt: string;
+  };
+  attendanceCount: number;
+  contributionCount: number;
+  totalGained: number;
+  averageGivingPerAttendee: number;
+  categoryTotals: Record<string, number>;
+  cellTotals: {
+    JOY: number;
+    FAITH: number;
+    HOPE: number;
+    LOVE: number;
+    GENERAL: number;
+  };
+  paymentMethodTotals: {
+    CASH: number;
+    MOBILE_MONEY: number;
+    BANK_TRANSFER: number;
+    CHEQUE: number;
+  };
+  contributions: FinancialContribution[];
+}
+
+export interface ServicesFinancialAuditResponse {
+  summary: {
+    totalServicesAudited: number;
+    cumulativeGainedAllServices: number;
+    averageGainedPerService: number;
+    highestSingleServiceGained: number;
+    highestGainedSessionTitle: string;
+  };
+  services: ServiceFinancialAuditRecord[];
 }
 
 export interface MessageLog {

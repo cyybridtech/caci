@@ -18,7 +18,8 @@ import {
   UserRole,
   ChurchGroup,
   ChurchExpense,
-  ExpenseSummary
+  ExpenseSummary,
+  ServicesFinancialAuditResponse
 } from '../types/index.ts';
 
 const BASE_URL = (import.meta.env.VITE_API_URL as string) || '/api';
@@ -364,6 +365,16 @@ export const api = {
       headers: getAuthHeaders()
     });
     if (!res.ok) throw new Error('Failed to fetch financial summary');
+    return res.json();
+  },
+
+  async getServicesFinancialAudit(search?: string): Promise<ServicesFinancialAuditResponse> {
+    const query = new URLSearchParams();
+    if (search && search.trim()) query.append('search', search.trim());
+    const res = await fetch(`${BASE_URL}/finances/services-audit?${query.toString()}`, {
+      headers: getAuthHeaders()
+    });
+    if (!res.ok) throw new Error('Failed to fetch services financial audit');
     return res.json();
   },
 

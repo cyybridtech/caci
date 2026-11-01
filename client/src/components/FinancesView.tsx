@@ -28,7 +28,15 @@ import {
   Building,
   Gift,
   ExternalLink,
-  ChevronRight
+  ChevronRight,
+  History,
+  ShieldCheck,
+  Award,
+  Sparkles,
+  Filter,
+  Clock,
+  Banknote,
+  RefreshCw
 } from 'lucide-react';
 import {
   FinancialContribution,
@@ -39,7 +47,9 @@ import {
   PaymentMethod,
   ChurchExpense,
   ExpenseCategory,
-  ChurchGroup
+  ChurchGroup,
+  ServiceFinancialAuditRecord,
+  ServicesFinancialAuditResponse
 } from '../types/index.ts';
 import { ReceiptModal } from './ReceiptModal.tsx';
 import { api } from '../services/api.ts';
@@ -55,7 +65,7 @@ interface FinancesViewProps {
   onDeleteContribution?: (id: string) => Promise<void>;
 }
 
-type MainTab = 'contributions' | 'expenses' | 'members';
+type MainTab = 'contributions' | 'audit' | 'expenses' | 'members';
 
 const EXPENSE_CATEGORY_LABELS: Record<ExpenseCategory, string> = {
   UTILITY: 'Utility Bills',
@@ -147,10 +157,108 @@ export const FinancesView: React.FC<FinancesViewProps> = ({
   const [memberSearchTerm, setMemberSearchTerm] = useState('');
   const [memberCellFilter, setMemberCellFilter] = useState<string>('ALL');
 
-  // Load expenses on mount and when tab becomes active
+  // ─── Desk View Scope: Active Service Session vs All-Time Treasury ───
+  const [deskScope, setDeskScope] = useState<'THIS_SERVICE' | 'ALL_TIME'>('THIS_SERVICE');
+
+  // Filter contributions specifically for the active service session
+  const currentServiceContributions = useMemo(() => {
+    if (!session?.id) return [];
+    return contributions.filter((c) => c.sessionId === session.id);
+  }, [contributions, session]);
+
+  const currentServiceTotal = useMemo(() => {
+    return currentServiceContributions.reduce((sum, c) => sum + (Number(c.amount) || 0), 0);
+  }, [currentServiceContributions]);
+
+  const currentServiceTithes = useMemo(() => {
+    return currentServiceContributions
+      .filter((c) => c.category === 'TITHE')
+      .reduce((sum, c) => sum + (Number(c.amount) || 0), 0);
+  }, [currentServiceContributions]);
+
+  const currentServiceOfferings = useMemo(() => {
+    return currentServiceContributions
+      .filter((c) => c.category === 'OFFERING')
+      .reduce((sum, c) => sum + (Number(c.amount) || 0), 0);
+  }, [currentServiceContributions]);
+
+  const currentServiceCellBreakdown = useMemo(() => {
+    const cells = { JOY: 0, FAITH: 0, HOPE: 0, LOVE: 0, GENERAL: 0 };
+    for (const c of currentServiceContributions) {
+      const amt = Number(c.amount) || 0;
+      if (c.member && c.member.churchGroup && cells[c.member.churchGroup] !== undefined) {
+        cells[c.member.churchGroup] += amt;
+      } else {
+        cells.GENERAL += amt;
+      }
+    }
+    return cells;
+  }, [currentServiceContributions]);
+
+  // ─── Service Financial Audit Tab State ───
+  const [auditData, setAuditData] = useState<ServicesFinancialAuditResponse | null>(null);
+  const [isLoadingAudit, setIsLoadingAudit] = useState(false);
+  const [auditSearchTerm, setAuditSearchTerm] = useState('');
+  const [auditTypeFilter, setAuditTypeFilter] = useState('ALL');
+  const [selectedAuditRecord, setSelectedAuditRecord] = useState<ServiceFinancialAuditRecord | null>(null);
+  const [isPrintSlipOpen, setIsPrintSlipOpen] = useState(false);
+
+  const loadAuditData = async (searchTerm?: string) => {
+    try {
+      setIsLoadingAudit(true);
+      const res = await api.getServicesFinancialAudit(searchTerm ?? auditSearchTerm);
+      setAuditData(res);
+    } catch (err) {
+      console.error('Failed to load services financial audit:', err);
+    } finally {
+      setIsLoadingAudit(false);
+    }
+  };
+
   useEffect(() => {
-    api.getExpenses().then(setExpenses).catch(console.error);
-  }, []);
+    if (mainTab === 'audit') {
+      loadAuditData();
+    }
+  }, [mainTab]);
+
+  const [auditLedgerCategoryFilter, setAuditLedgerCategoryFilter] = useState('ALL');
+  const [auditLedgerSearchTerm, setAuditLedgerSearchTerm] = useState('');
+
+  const filteredAuditServices = useMemo(() => {
+    if (!auditData?.services) return [];
+    return auditData.services.filter((s) => {
+      if (auditTypeFilter !== 'ALL') {
+        const type = s.session.serviceType.toLowerCase();
+        if (auditTypeFilter === 'SUNDAY' && !type.includes('sunday')) return false;
+        if (auditTypeFilter === 'MIDWEEK' && !type.includes('midweek') && !type.includes('wednesday') && !type.includes('teaching')) return false;
+        if (auditTypeFilter === 'ALL_NIGHT' && !type.includes('night') && !type.includes('vigil')) return false;
+      }
+      if (auditSearchTerm.trim()) {
+        const q = auditSearchTerm.toLowerCase().trim();
+        const type = (s.session.serviceType || '').toLowerCase();
+        const theme = (s.session.theme || '').toLowerCase();
+        const date = new Date(s.session.serviceDate).toLocaleDateString().toLowerCase();
+        const notes = (s.session.notes || '').toLowerCase();
+        return type.includes(q) || theme.includes(q) || date.includes(q) || notes.includes(q);
+      }
+      return true;
+    });
+  }, [auditData, auditTypeFilter, auditSearchTerm]);
+
+  const filteredAuditRecordContributions = useMemo(() => {
+    if (!selectedAuditRecord?.contributions) return [];
+    return selectedAuditRecord.contributions.filter((c) => {
+      if (auditLedgerCategoryFilter !== 'ALL' && c.category !== auditLedgerCategoryFilter) return false;
+      if (auditLedgerSearchTerm.trim()) {
+        const q = auditLedgerSearchTerm.toLowerCase().trim();
+        const name = c.member ? `${c.member.firstName} ${c.member.lastName}`.toLowerCase() : 'general anonymous';
+        const code = (c.member?.memberCode || '').toLowerCase();
+        const notes = (c.notes || '').toLowerCase();
+        return name.includes(q) || code.includes(q) || notes.includes(q);
+      }
+      return true;
+    });
+  }, [selectedAuditRecord, auditLedgerCategoryFilter, auditLedgerSearchTerm]);
 
   useEffect(() => {
     if (mainTab === 'expenses') {
@@ -472,78 +580,192 @@ export const FinancesView: React.FC<FinancesViewProps> = ({
         </div>
       </div>
 
-      {/* ── Summary Cards ── */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-slate-900 text-white p-5 rounded-3xl border border-slate-800 shadow-sm">
-          <div className="flex items-center space-x-2 mb-1">
-            <ArrowUpRight className="w-4 h-4 text-emerald-400" />
-            <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Total Inflow</span>
-          </div>
-          <span className="text-3xl font-extrabold text-white block">
-            GH₵ {Number(summary?.totalAmount || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
-          </span>
-          <span className="text-[11px] text-emerald-400 mt-1 block font-semibold">
-            {summary?.recordCount || 0} contributions recorded
-          </span>
+      {/* ── Financial Scope Switcher ── */}
+      <div className="bg-white p-4 rounded-3xl border border-slate-200 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div className="flex items-center space-x-2">
+          <button
+            onClick={() => setDeskScope('THIS_SERVICE')}
+            className={`flex items-center space-x-2 px-4 py-2 rounded-2xl text-xs font-extrabold transition cursor-pointer ${
+              deskScope === 'THIS_SERVICE'
+                ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/20'
+                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+            }`}
+          >
+            <Clock className="w-4 h-4" />
+            <span>Active Service Inflow</span>
+            {session && (
+              <span className="px-1.5 py-0.5 rounded-full text-[10px] bg-white/20 text-white font-bold">
+                {currentServiceContributions.length}
+              </span>
+            )}
+          </button>
+
+          <button
+            onClick={() => setDeskScope('ALL_TIME')}
+            className={`flex items-center space-x-2 px-4 py-2 rounded-2xl text-xs font-extrabold transition cursor-pointer ${
+              deskScope === 'ALL_TIME'
+                ? 'bg-slate-900 text-white shadow-md shadow-slate-900/20'
+                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+            }`}
+          >
+            <Building className="w-4 h-4" />
+            <span>All-Time Treasury</span>
+          </button>
         </div>
 
-        <div className="bg-white p-5 rounded-3xl border border-rose-200 shadow-sm">
-          <div className="flex items-center space-x-2 mb-1">
-            <ArrowDownLeft className="w-4 h-4 text-rose-500" />
-            <span className="text-[11px] font-bold text-rose-900 uppercase tracking-wider">Total Expenses</span>
-          </div>
-          <span className="text-3xl font-extrabold text-rose-700 block">
-            GH₵ {totalExpenses.toLocaleString(undefined, { minimumFractionDigits: 2 })}
-          </span>
-          <span className="text-[11px] text-slate-400 mt-1 block font-medium">
-            {expenses.length} church expense entries
-          </span>
-        </div>
-
-        <div className={`p-5 rounded-3xl border shadow-sm ${netBalance >= 0 ? 'bg-emerald-50 border-emerald-200' : 'bg-rose-50 border-rose-200'}`}>
-          <div className="flex items-center space-x-2 mb-1">
-            {netBalance >= 0
-              ? <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-              : <AlertCircle className="w-4 h-4 text-rose-600" />}
-            <span className={`text-[11px] font-bold uppercase tracking-wider ${netBalance >= 0 ? 'text-emerald-900' : 'text-rose-900'}`}>
-              Net Balance
+        <div className="text-xs text-slate-500 font-semibold flex items-center space-x-2">
+          {deskScope === 'THIS_SERVICE' ? (
+            session ? (
+              <span className="flex items-center space-x-1.5 text-emerald-800 bg-emerald-50 px-3 py-1.5 rounded-xl border border-emerald-200 font-bold">
+                <Sparkles className="w-3.5 h-3.5 text-emerald-600" />
+                <span>
+                  Current Service: {session.serviceType} ({new Date(session.serviceDate).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })})
+                </span>
+              </span>
+            ) : (
+              <span className="text-amber-700 bg-amber-50 px-3 py-1.5 rounded-xl border border-amber-200 font-bold">
+                No active service selected. All records shown.
+              </span>
+            )
+          ) : (
+            <span className="text-slate-600 bg-slate-50 px-3 py-1.5 rounded-xl border border-slate-200 font-bold">
+              Cumulative treasury balance across all church history
             </span>
-          </div>
-          <span className={`text-3xl font-extrabold block ${netBalance >= 0 ? 'text-emerald-700' : 'text-rose-700'}`}>
-            GH₵ {Math.abs(netBalance).toLocaleString(undefined, { minimumFractionDigits: 2 })}
-          </span>
-          <span className={`text-[11px] mt-1 block font-medium ${netBalance >= 0 ? 'text-emerald-700' : 'text-rose-600'}`}>
-            {netBalance >= 0 ? 'Net Surplus' : 'Net Deficit'}
-          </span>
-        </div>
-
-        <div className="bg-white p-5 rounded-3xl border border-blue-200 shadow-sm">
-          <div className="flex items-center space-x-2 mb-1">
-            <Receipt className="w-4 h-4 text-blue-600" />
-            <span className="text-[11px] font-bold text-blue-900 uppercase tracking-wider">Tithes</span>
-          </div>
-          <span className="text-3xl font-extrabold text-blue-700 block">
-            GH₵ {Number(summary?.categoryTotals?.TITHE || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
-          </span>
-          <span className="text-[11px] text-slate-400 mt-1 block font-medium">Covenant tithes</span>
+          )}
         </div>
       </div>
+
+      {/* ── Summary Cards ── */}
+      {deskScope === 'THIS_SERVICE' && session ? (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="bg-emerald-950 text-white p-5 rounded-3xl border border-emerald-800 shadow-sm">
+            <div className="flex items-center space-x-2 mb-1">
+              <Sparkles className="w-4 h-4 text-emerald-400" />
+              <span className="text-[11px] font-bold text-emerald-300 uppercase tracking-wider">Today's Service Inflow</span>
+            </div>
+            <span className="text-3xl font-extrabold text-white block">
+              GH₵ {currentServiceTotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+            </span>
+            <span className="text-[11px] text-emerald-400 mt-1 block font-semibold">
+              {currentServiceContributions.length} contributions for this service
+            </span>
+          </div>
+
+          <div className="bg-white p-5 rounded-3xl border border-blue-200 shadow-sm">
+            <div className="flex items-center space-x-2 mb-1">
+              <Receipt className="w-4 h-4 text-blue-600" />
+              <span className="text-[11px] font-bold text-blue-900 uppercase tracking-wider">Service Tithes</span>
+            </div>
+            <span className="text-3xl font-extrabold text-blue-700 block">
+              GH₵ {currentServiceTithes.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+            </span>
+            <span className="text-[11px] text-slate-400 mt-1 block font-medium">Covenant tithes paid today</span>
+          </div>
+
+          <div className="bg-white p-5 rounded-3xl border border-amber-200 shadow-sm">
+            <div className="flex items-center space-x-2 mb-1">
+              <Gift className="w-4 h-4 text-amber-600" />
+              <span className="text-[11px] font-bold text-amber-900 uppercase tracking-wider">Service Offering</span>
+            </div>
+            <span className="text-3xl font-extrabold text-amber-700 block">
+              GH₵ {currentServiceOfferings.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+            </span>
+            <span className="text-[11px] text-slate-400 mt-1 block font-medium">General congregation offering</span>
+          </div>
+
+          <div className="bg-white p-5 rounded-3xl border border-purple-200 shadow-sm">
+            <div className="flex items-center space-x-2 mb-1">
+              <Heart className="w-4 h-4 text-purple-600" />
+              <span className="text-[11px] font-bold text-purple-900 uppercase tracking-wider">Other Collections</span>
+            </div>
+            <span className="text-3xl font-extrabold text-purple-700 block">
+              GH₵ {Math.max(0, currentServiceTotal - currentServiceTithes - currentServiceOfferings).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+            </span>
+            <span className="text-[11px] text-slate-400 mt-1 block font-medium">Welfare, seeds & thanksgiving</span>
+          </div>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="bg-slate-900 text-white p-5 rounded-3xl border border-slate-800 shadow-sm">
+            <div className="flex items-center space-x-2 mb-1">
+              <ArrowUpRight className="w-4 h-4 text-emerald-400" />
+              <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Total Inflow</span>
+            </div>
+            <span className="text-3xl font-extrabold text-white block">
+              GH₵ {Number(summary?.totalAmount || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+            </span>
+            <span className="text-[11px] text-emerald-400 mt-1 block font-semibold">
+              {summary?.recordCount || 0} contributions recorded
+            </span>
+          </div>
+
+          <div className="bg-white p-5 rounded-3xl border border-rose-200 shadow-sm">
+            <div className="flex items-center space-x-2 mb-1">
+              <ArrowDownLeft className="w-4 h-4 text-rose-500" />
+              <span className="text-[11px] font-bold text-rose-900 uppercase tracking-wider">Total Expenses</span>
+            </div>
+            <span className="text-3xl font-extrabold text-rose-700 block">
+              GH₵ {totalExpenses.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+            </span>
+            <span className="text-[11px] text-slate-400 mt-1 block font-medium">
+              {expenses.length} church expense entries
+            </span>
+          </div>
+
+          <div className={`p-5 rounded-3xl border shadow-sm ${netBalance >= 0 ? 'bg-emerald-50 border-emerald-200' : 'bg-rose-50 border-rose-200'}`}>
+            <div className="flex items-center space-x-2 mb-1">
+              {netBalance >= 0
+                ? <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                : <AlertCircle className="w-4 h-4 text-rose-600" />}
+              <span className={`text-[11px] font-bold uppercase tracking-wider ${netBalance >= 0 ? 'text-emerald-900' : 'text-rose-900'}`}>
+                Net Balance
+              </span>
+            </div>
+            <span className={`text-3xl font-extrabold block ${netBalance >= 0 ? 'text-emerald-700' : 'text-rose-700'}`}>
+              GH₵ {Math.abs(netBalance).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+            </span>
+            <span className={`text-[11px] mt-1 block font-medium ${netBalance >= 0 ? 'text-emerald-700' : 'text-rose-600'}`}>
+              {netBalance >= 0 ? 'Net Surplus' : 'Net Deficit'}
+            </span>
+          </div>
+
+          <div className="bg-white p-5 rounded-3xl border border-blue-200 shadow-sm">
+            <div className="flex items-center space-x-2 mb-1">
+              <Receipt className="w-4 h-4 text-blue-600" />
+              <span className="text-[11px] font-bold text-blue-900 uppercase tracking-wider">Tithes</span>
+            </div>
+            <span className="text-3xl font-extrabold text-blue-700 block">
+              GH₵ {Number(summary?.categoryTotals?.TITHE || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+            </span>
+            <span className="text-[11px] text-slate-400 mt-1 block font-medium">Covenant tithes</span>
+          </div>
+        </div>
+      )}
 
       {/* ── Cell Comparison ── */}
       <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm space-y-4">
         <h3 className="font-extrabold text-sm text-slate-900 flex items-center space-x-2">
           <TrendingUp className="w-4 h-4 text-blue-600" />
-          <span>Giving Comparison Across Cells (Joy, Faith, Hope, Love)</span>
+          <span>
+            {deskScope === 'THIS_SERVICE' && session
+              ? `Service Giving by Cell: ${session.serviceType}`
+              : 'All-Time Giving Comparison Across Cells (Joy, Faith, Hope, Love)'}
+          </span>
         </h3>
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          {([['JOY', 'Joy Cell', 'amber'], ['FAITH', 'Faith Cell', 'blue'], ['HOPE', 'Hope Cell', 'emerald'], ['LOVE', 'Love Cell', 'rose']] as const).map(([key, label, color]) => (
-            <div key={key} className={`p-4 rounded-2xl bg-${color}-50/70 border border-${color}-200 space-y-1`}>
-              <span className={`font-bold text-xs text-${color}-900 uppercase tracking-wider block`}>{label}</span>
-              <div className={`text-2xl font-extrabold text-${color}-800`}>
-                GH₵ {Number(summary?.cellComparison?.[key] ?? 0).toFixed(2)}
+          {([['JOY', 'Joy Cell', 'amber'], ['FAITH', 'Faith Cell', 'blue'], ['HOPE', 'Hope Cell', 'emerald'], ['LOVE', 'Love Cell', 'rose']] as const).map(([key, label, color]) => {
+            const val = deskScope === 'THIS_SERVICE' && session
+              ? currentServiceCellBreakdown[key]
+              : Number(summary?.cellComparison?.[key] ?? 0);
+            return (
+              <div key={key} className={`p-4 rounded-2xl bg-${color}-50/70 border border-${color}-200 space-y-1`}>
+                <span className={`font-bold text-xs text-${color}-900 uppercase tracking-wider block`}>{label}</span>
+                <div className={`text-2xl font-extrabold text-${color}-800`}>
+                  GH₵ {val.toFixed(2)}
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </div>
 
@@ -559,9 +781,24 @@ export const FinancesView: React.FC<FinancesViewProps> = ({
             }`}
           >
             <ArrowUpRight className="w-4 h-4" />
-            <span>Contributions & Income</span>
+            <span>Contributions & Inflow</span>
             <span className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold ${mainTab === 'contributions' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-200 text-slate-500'}`}>
               {contributions.length}
+            </span>
+          </button>
+
+          <button
+            onClick={() => setMainTab('audit')}
+            className={`flex items-center space-x-2 px-6 py-4 text-xs font-bold transition border-b-2 cursor-pointer whitespace-nowrap ${
+              mainTab === 'audit'
+                ? 'border-purple-600 text-purple-700 bg-white'
+                : 'border-transparent text-slate-500 hover:text-slate-700'
+            }`}
+          >
+            <History className="w-4 h-4 text-purple-600" />
+            <span>Service Financial Audit</span>
+            <span className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold ${mainTab === 'audit' ? 'bg-purple-100 text-purple-700' : 'bg-slate-200 text-slate-500'}`}>
+              {auditData?.services ? auditData.services.length : 'Audits'}
             </span>
           </button>
 
@@ -717,6 +954,322 @@ export const FinancesView: React.FC<FinancesViewProps> = ({
               </div>
             )}
           </>
+        )}
+
+        {/* ──── TAB: SERVICE FINANCIAL AUDIT (TRACKING GAINS PER SERVICE ACROSS HISTORY) ──── */}
+        {mainTab === 'audit' && (
+          <div className="p-6 space-y-6">
+            {/* Top KPI Cards for Audit */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="bg-slate-900 text-white p-5 rounded-3xl border border-slate-800 shadow-sm">
+                <div className="flex items-center space-x-2 mb-1">
+                  <Calendar className="w-4 h-4 text-purple-400" />
+                  <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+                    Services Audited
+                  </span>
+                </div>
+                <span className="text-3xl font-extrabold text-white block">
+                  {auditData?.summary?.totalServicesAudited || 0}
+                </span>
+                <span className="text-[11px] text-purple-300 mt-1 block font-semibold">
+                  Historical worship services
+                </span>
+              </div>
+
+              <div className="bg-white p-5 rounded-3xl border border-emerald-200 shadow-sm">
+                <div className="flex items-center space-x-2 mb-1">
+                  <TrendingUp className="w-4 h-4 text-emerald-600" />
+                  <span className="text-[11px] font-bold text-emerald-900 uppercase tracking-wider">
+                    Total Gained Across Services
+                  </span>
+                </div>
+                <span className="text-3xl font-extrabold text-emerald-700 block">
+                  GH₵ {Number(auditData?.summary?.cumulativeGainedAllServices || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                </span>
+                <span className="text-[11px] text-slate-400 mt-1 block font-medium">
+                  Cumulative collections verified
+                </span>
+              </div>
+
+              <div className="bg-white p-5 rounded-3xl border border-blue-200 shadow-sm">
+                <div className="flex items-center space-x-2 mb-1">
+                  <Receipt className="w-4 h-4 text-blue-600" />
+                  <span className="text-[11px] font-bold text-blue-900 uppercase tracking-wider">
+                    Average Gained / Service
+                  </span>
+                </div>
+                <span className="text-3xl font-extrabold text-blue-700 block">
+                  GH₵ {Number(auditData?.summary?.averageGainedPerService || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                </span>
+                <span className="text-[11px] text-slate-400 mt-1 block font-medium">
+                  Typical Sunday / Midweek intake
+                </span>
+              </div>
+
+              <div className="bg-white p-5 rounded-3xl border border-amber-200 shadow-sm">
+                <div className="flex items-center space-x-2 mb-1">
+                  <Award className="w-4 h-4 text-amber-600" />
+                  <span className="text-[11px] font-bold text-amber-900 uppercase tracking-wider">
+                    Highest Single Service
+                  </span>
+                </div>
+                <span className="text-3xl font-extrabold text-amber-700 block">
+                  GH₵ {Number(auditData?.summary?.highestSingleServiceGained || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                </span>
+                <span className="text-[11px] text-slate-500 mt-1 block font-medium truncate" title={auditData?.summary?.highestGainedSessionTitle}>
+                  {auditData?.summary?.highestGainedSessionTitle || 'N/A'}
+                </span>
+              </div>
+            </div>
+
+            {/* Audit Toolbar: Search, Filters, Refresh */}
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 bg-slate-50 p-4 rounded-2xl border border-slate-200">
+              <div className="relative flex-1 max-w-md">
+                <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
+                <input
+                  type="text"
+                  placeholder="Search service type, theme, or notes..."
+                  value={auditSearchTerm}
+                  onChange={(e) => setAuditSearchTerm(e.target.value)}
+                  className="w-full pl-9 pr-4 py-2 border border-slate-300 rounded-xl text-xs font-semibold focus:ring-2 focus:ring-purple-500 focus:outline-none bg-white"
+                />
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2">
+                {[
+                  { key: 'ALL', label: 'All Services' },
+                  { key: 'SUNDAY', label: 'Sunday Divine' },
+                  { key: 'MIDWEEK', label: 'Midweek' },
+                  { key: 'ALL_NIGHT', label: 'All-Night' }
+                ].map((f) => (
+                  <button
+                    key={f.key}
+                    onClick={() => setAuditTypeFilter(f.key)}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-extrabold transition cursor-pointer ${
+                      auditTypeFilter === f.key
+                        ? 'bg-purple-600 text-white shadow-sm'
+                        : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-100'
+                    }`}
+                  >
+                    {f.label}
+                  </button>
+                ))}
+
+                <button
+                  onClick={() => loadAuditData()}
+                  disabled={isLoadingAudit}
+                  className="p-2 bg-white border border-slate-200 text-slate-600 hover:text-purple-600 hover:bg-purple-50 rounded-xl transition cursor-pointer"
+                  title="Refresh Audit Data"
+                >
+                  <RefreshCw className={`w-4 h-4 ${isLoadingAudit ? 'animate-spin text-purple-600' : ''}`} />
+                </button>
+              </div>
+            </div>
+
+            {/* Services List */}
+            {isLoadingAudit ? (
+              <div className="py-24 text-center text-slate-400 space-y-3">
+                <div className="w-8 h-8 border-4 border-purple-600 border-t-transparent rounded-full animate-spin mx-auto" />
+                <p className="text-xs font-semibold">Auditing church services and finances...</p>
+              </div>
+            ) : filteredAuditServices.length === 0 ? (
+              <div className="py-20 text-center text-slate-400 space-y-2 bg-white rounded-3xl border border-slate-200">
+                <History className="w-12 h-12 mx-auto text-slate-300" />
+                <p className="text-sm font-bold text-slate-700">No matching service financial records found</p>
+                <p className="text-xs text-slate-400">
+                  Services recorded on the top header bar with financial contributions will be audited here.
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {filteredAuditServices.map((record) => {
+                  const s = record.session;
+                  const dateStr = new Date(s.serviceDate).toLocaleDateString(undefined, {
+                    weekday: 'short',
+                    year: 'numeric',
+                    month: 'short',
+                    day: 'numeric'
+                  });
+
+                  return (
+                    <div
+                      key={s.id}
+                      className="bg-white rounded-3xl border border-slate-200 p-6 shadow-sm hover:shadow-md transition space-y-4"
+                    >
+                      {/* Card Header */}
+                      <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 pb-4 border-b border-slate-100">
+                        <div className="flex items-start space-x-3.5">
+                          <div className="p-3 bg-purple-50 text-purple-700 rounded-2xl shrink-0 mt-0.5">
+                            <Calendar className="w-5 h-5" />
+                          </div>
+                          <div>
+                            <div className="flex items-center space-x-2 flex-wrap gap-y-1">
+                              <h4 className="font-extrabold text-base text-slate-900">{s.serviceType}</h4>
+                              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-purple-100 text-purple-800 uppercase tracking-wide">
+                                {dateStr}
+                              </span>
+                              {record.attendanceCount > 0 && (
+                                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-blue-50 text-blue-700 border border-blue-200 flex items-center space-x-1">
+                                  <UsersIcon className="w-3 h-3" />
+                                  <span>{record.attendanceCount} Attendees</span>
+                                </span>
+                              )}
+                            </div>
+                            {s.theme && (
+                              <p className="text-xs text-slate-500 font-medium mt-1">
+                                Theme: <span className="font-semibold text-slate-800">"{s.theme}"</span>
+                              </p>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Total Gained Highlight & Action Buttons */}
+                        <div className="flex items-center space-x-3 self-end md:self-auto">
+                          <div className="text-right">
+                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                              Service Gain
+                            </span>
+                            <span className="text-2xl font-black text-emerald-700 block">
+                              GH₵ {record.totalGained.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                            </span>
+                            {record.attendanceCount > 0 && (
+                              <span className="text-[11px] text-slate-500 font-semibold block">
+                                GH₵ {record.averageGivingPerAttendee.toFixed(2)} / attendee
+                              </span>
+                            )}
+                          </div>
+
+                          <div className="flex items-center space-x-1.5 pl-2 border-l border-slate-200">
+                            <button
+                              onClick={() => setSelectedAuditRecord(record)}
+                              className="px-3.5 py-2 rounded-xl bg-purple-50 hover:bg-purple-100 text-purple-700 text-xs font-bold transition flex items-center space-x-1.5 cursor-pointer shadow-sm"
+                              title="Inspect Itemized Financial Ledger"
+                            >
+                              <Receipt className="w-4 h-4" />
+                              <span>View Ledger</span>
+                            </button>
+
+                            <button
+                              onClick={() => {
+                                setSelectedAuditRecord(record);
+                                setIsPrintSlipOpen(true);
+                              }}
+                              className="p-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition cursor-pointer"
+                              title="Print Service Audit Slip"
+                            >
+                              <Printer className="w-4 h-4 text-slate-600" />
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Financial Category Breakdown Grid */}
+                      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5">
+                        <div className="p-3 bg-blue-50/70 border border-blue-200/80 rounded-2xl">
+                          <span className="text-[10px] font-bold text-blue-900 uppercase tracking-wider block">
+                            Tithes
+                          </span>
+                          <span className="text-base font-extrabold text-blue-800 block mt-0.5">
+                            GH₵ {(record.categoryTotals.TITHE || 0).toFixed(2)}
+                          </span>
+                        </div>
+
+                        <div className="p-3 bg-amber-50/70 border border-amber-200/80 rounded-2xl">
+                          <span className="text-[10px] font-bold text-amber-900 uppercase tracking-wider block">
+                            Offering
+                          </span>
+                          <span className="text-base font-extrabold text-amber-800 block mt-0.5">
+                            GH₵ {(record.categoryTotals.OFFERING || 0).toFixed(2)}
+                          </span>
+                        </div>
+
+                        <div className="p-3 bg-rose-50/70 border border-rose-200/80 rounded-2xl">
+                          <span className="text-[10px] font-bold text-rose-900 uppercase tracking-wider block">
+                            Thanksgiving
+                          </span>
+                          <span className="text-base font-extrabold text-rose-800 block mt-0.5">
+                            GH₵ {(record.categoryTotals.THANKSGIVING || 0).toFixed(2)}
+                          </span>
+                        </div>
+
+                        <div className="p-3 bg-emerald-50/70 border border-emerald-200/80 rounded-2xl">
+                          <span className="text-[10px] font-bold text-emerald-900 uppercase tracking-wider block">
+                            Welfare
+                          </span>
+                          <span className="text-base font-extrabold text-emerald-800 block mt-0.5">
+                            GH₵ {(record.categoryTotals.WELFARE || 0).toFixed(2)}
+                          </span>
+                        </div>
+
+                        <div className="p-3 bg-purple-50/70 border border-purple-200/80 rounded-2xl">
+                          <span className="text-[10px] font-bold text-purple-900 uppercase tracking-wider block">
+                            Building Fund
+                          </span>
+                          <span className="text-base font-extrabold text-purple-800 block mt-0.5">
+                            GH₵ {(record.categoryTotals.BUILDING_PROJECT || 0).toFixed(2)}
+                          </span>
+                        </div>
+
+                        <div className="p-3 bg-indigo-50/70 border border-indigo-200/80 rounded-2xl">
+                          <span className="text-[10px] font-bold text-indigo-900 uppercase tracking-wider block">
+                            Special Seed
+                          </span>
+                          <span className="text-base font-extrabold text-indigo-800 block mt-0.5">
+                            GH₵ {(record.categoryTotals.SPECIAL_SEED || 0).toFixed(2)}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Cell & Payment Method Summary Tags */}
+                      <div className="pt-2 border-t border-slate-100 flex flex-wrap items-center justify-between gap-3 text-xs">
+                        {/* Cell Giving */}
+                        <div className="flex items-center space-x-2 flex-wrap gap-y-1">
+                          <span className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider mr-1">
+                            Cell Giving:
+                          </span>
+                          <span className="px-2 py-0.5 rounded-lg bg-amber-50 text-amber-800 border border-amber-200 text-[10px] font-bold">
+                            Joy: GH₵ {(record.cellTotals.JOY || 0).toFixed(2)}
+                          </span>
+                          <span className="px-2 py-0.5 rounded-lg bg-blue-50 text-blue-800 border border-blue-200 text-[10px] font-bold">
+                            Faith: GH₵ {(record.cellTotals.FAITH || 0).toFixed(2)}
+                          </span>
+                          <span className="px-2 py-0.5 rounded-lg bg-emerald-50 text-emerald-800 border border-emerald-200 text-[10px] font-bold">
+                            Hope: GH₵ {(record.cellTotals.HOPE || 0).toFixed(2)}
+                          </span>
+                          <span className="px-2 py-0.5 rounded-lg bg-rose-50 text-rose-800 border border-rose-200 text-[10px] font-bold">
+                            Love: GH₵ {(record.cellTotals.LOVE || 0).toFixed(2)}
+                          </span>
+                          {record.cellTotals.GENERAL > 0 && (
+                            <span className="px-2 py-0.5 rounded-lg bg-slate-100 text-slate-700 text-[10px] font-bold">
+                              General: GH₵ {record.cellTotals.GENERAL.toFixed(2)}
+                            </span>
+                          )}
+                        </div>
+
+                        {/* Payment Modes */}
+                        <div className="flex items-center space-x-2 text-[11px] font-medium text-slate-500">
+                          <span className="flex items-center space-x-1">
+                            <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+                            <span>Cash: GH₵ {(record.paymentMethodTotals.CASH || 0).toFixed(2)}</span>
+                          </span>
+                          <span className="flex items-center space-x-1">
+                            <span className="w-2 h-2 rounded-full bg-amber-500"></span>
+                            <span>MoMo: GH₵ {(record.paymentMethodTotals.MOBILE_MONEY || 0).toFixed(2)}</span>
+                          </span>
+                          {record.paymentMethodTotals.BANK_TRANSFER > 0 && (
+                            <span className="flex items-center space-x-1">
+                              <span className="w-2 h-2 rounded-full bg-blue-500"></span>
+                              <span>Bank: GH₵ {record.paymentMethodTotals.BANK_TRANSFER.toFixed(2)}</span>
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
         )}
 
         {/* ──── TAB 2: CHURCH EXPENSES TABLE ──── */}
@@ -1529,6 +2082,429 @@ export const FinancesView: React.FC<FinancesViewProps> = ({
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* ── Modal 1: Itemized Service Financial Ledger ── */}
+      {selectedAuditRecord && !isPrintSlipOpen && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+          <div className="bg-white rounded-3xl w-full max-w-4xl shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200 max-h-[92vh] flex flex-col my-auto border border-slate-200">
+            {/* Header */}
+            <div className="bg-slate-900 text-white px-6 py-4 flex items-center justify-between shrink-0">
+              <div className="flex items-center space-x-3">
+                <div className="p-2.5 bg-purple-600 rounded-xl text-white">
+                  <Receipt className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-extrabold text-base">
+                    Service Financial Ledger
+                  </h3>
+                  <p className="text-[11px] text-slate-300">
+                    {selectedAuditRecord.session.serviceType} • {new Date(selectedAuditRecord.session.serviceDate).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })}
+                    {selectedAuditRecord.attendanceCount > 0 && ` • ${selectedAuditRecord.attendanceCount} Attendees`}
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center space-x-2">
+                <button
+                  onClick={() => setIsPrintSlipOpen(true)}
+                  className="px-3 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold transition flex items-center space-x-1.5 cursor-pointer shadow-sm"
+                >
+                  <Printer className="w-3.5 h-3.5" />
+                  <span>Print Audit Slip</span>
+                </button>
+                <button
+                  onClick={() => {
+                    setSelectedAuditRecord(null);
+                    setAuditLedgerCategoryFilter('ALL');
+                    setAuditLedgerSearchTerm('');
+                  }}
+                  className="p-1.5 rounded-xl hover:bg-slate-800 text-slate-400 hover:text-white transition cursor-pointer"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-6 overflow-y-auto space-y-5 flex-1">
+              {/* Financial Gain Highlight Banner */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <div className="p-4 bg-emerald-950 text-white rounded-2xl border border-emerald-800">
+                  <span className="text-[10px] font-bold text-emerald-300 uppercase tracking-wider block">Total Gained</span>
+                  <span className="text-2xl font-black text-white block mt-0.5">
+                    GH₵ {selectedAuditRecord.totalGained.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                  </span>
+                  <span className="text-[10px] text-emerald-400 font-semibold block mt-1">
+                    {selectedAuditRecord.contributionCount} giving records
+                  </span>
+                </div>
+
+                <div className="p-4 bg-blue-50 border border-blue-200 rounded-2xl">
+                  <span className="text-[10px] font-bold text-blue-900 uppercase tracking-wider block">Covenant Tithes</span>
+                  <span className="text-2xl font-black text-blue-800 block mt-0.5">
+                    GH₵ {(selectedAuditRecord.categoryTotals.TITHE || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                  </span>
+                </div>
+
+                <div className="p-4 bg-amber-50 border border-amber-200 rounded-2xl">
+                  <span className="text-[10px] font-bold text-amber-900 uppercase tracking-wider block">General Offering</span>
+                  <span className="text-2xl font-black text-amber-800 block mt-0.5">
+                    GH₵ {(selectedAuditRecord.categoryTotals.OFFERING || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                  </span>
+                </div>
+
+                <div className="p-4 bg-purple-50 border border-purple-200 rounded-2xl">
+                  <span className="text-[10px] font-bold text-purple-900 uppercase tracking-wider block">Average / Person</span>
+                  <span className="text-2xl font-black text-purple-800 block mt-0.5">
+                    GH₵ {selectedAuditRecord.averageGivingPerAttendee.toFixed(2)}
+                  </span>
+                </div>
+              </div>
+
+              {/* Filter and Search within this service */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-50 p-3 rounded-2xl border border-slate-200">
+                <div className="relative flex-1 max-w-xs">
+                  <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-2.5" />
+                  <input
+                    type="text"
+                    placeholder="Search contributor name or notes..."
+                    value={auditLedgerSearchTerm}
+                    onChange={(e) => setAuditLedgerSearchTerm(e.target.value)}
+                    className="w-full pl-8 pr-3 py-1.5 bg-white border border-slate-300 rounded-xl text-xs font-semibold focus:ring-2 focus:ring-purple-500 focus:outline-none"
+                  />
+                </div>
+
+                <div className="flex items-center space-x-1.5 overflow-x-auto">
+                  {['ALL', 'TITHE', 'OFFERING', 'THANKSGIVING', 'WELFARE', 'BUILDING_PROJECT', 'SPECIAL_SEED'].map((cat) => (
+                    <button
+                      key={cat}
+                      onClick={() => setAuditLedgerCategoryFilter(cat)}
+                      className={`px-2.5 py-1 rounded-lg text-[10px] font-extrabold uppercase transition whitespace-nowrap cursor-pointer ${
+                        auditLedgerCategoryFilter === cat
+                          ? 'bg-purple-600 text-white shadow-sm'
+                          : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-100'
+                      }`}
+                    >
+                      {cat.replace(/_/g, ' ')}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Contributions Table */}
+              {filteredAuditRecordContributions.length === 0 ? (
+                <div className="py-12 text-center text-slate-400 space-y-1">
+                  <DollarSign className="w-8 h-8 mx-auto text-slate-300" />
+                  <p className="text-xs font-bold text-slate-600">No contributions match filter</p>
+                </div>
+              ) : (
+                <div className="overflow-x-auto border border-slate-200 rounded-2xl">
+                  <table className="w-full text-left text-xs">
+                    <thead className="bg-slate-50 text-slate-600 font-extrabold border-b border-slate-200 uppercase text-[10px]">
+                      <tr>
+                        <th className="px-4 py-3">Contributor</th>
+                        <th className="px-3 py-3">Cell</th>
+                        <th className="px-3 py-3">Category</th>
+                        <th className="px-3 py-3">Mode</th>
+                        <th className="px-3 py-3">Notes</th>
+                        <th className="px-4 py-3 text-right">Amount (GH₵)</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {filteredAuditRecordContributions.map((c) => (
+                        <tr key={c.id} className="hover:bg-slate-50/80 transition">
+                          <td className="px-4 py-3">
+                            {c.member ? (
+                              <div className="flex items-center space-x-2">
+                                {c.member.photoUrl ? (
+                                  <img src={c.member.photoUrl} alt="" className="w-6 h-6 rounded-md object-cover" />
+                                ) : (
+                                  <div className="w-6 h-6 rounded-md bg-purple-600 text-white font-bold text-[10px] flex items-center justify-center">
+                                    {c.member.firstName[0]}
+                                  </div>
+                                )}
+                                <div>
+                                  <span className="font-extrabold text-slate-900 block">
+                                    {c.member.firstName} {c.member.lastName}
+                                  </span>
+                                  <span className="text-[9px] text-slate-400 font-mono">
+                                    {c.member.memberCode || 'CACI'}
+                                  </span>
+                                </div>
+                              </div>
+                            ) : (
+                              <span className="font-semibold text-slate-500 italic">General / Anonymous</span>
+                            )}
+                          </td>
+                          <td className="px-3 py-3">
+                            {c.member ? (
+                              <span className={`px-1.5 py-0.5 rounded text-[9px] font-extrabold uppercase ${
+                                c.member.churchGroup === 'JOY'
+                                  ? 'bg-amber-100 text-amber-800'
+                                  : c.member.churchGroup === 'FAITH'
+                                  ? 'bg-blue-100 text-blue-800'
+                                  : c.member.churchGroup === 'HOPE'
+                                  ? 'bg-emerald-100 text-emerald-800'
+                                  : 'bg-rose-100 text-rose-800'
+                              }`}>
+                                {c.member.churchGroup}
+                              </span>
+                            ) : (
+                              <span className="text-slate-400 text-[10px]">—</span>
+                            )}
+                          </td>
+                          <td className="px-3 py-3">
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold uppercase bg-slate-100 text-slate-700">
+                              {c.category.replace(/_/g, ' ')}
+                            </span>
+                          </td>
+                          <td className="px-3 py-3">
+                            <span className="text-[11px] font-semibold text-slate-600">
+                              {c.paymentMethod.replace(/_/g, ' ')}
+                            </span>
+                          </td>
+                          <td className="px-3 py-3 text-slate-500 text-[11px] max-w-xs truncate">
+                            {c.notes || '—'}
+                          </td>
+                          <td className="px-4 py-3 text-right font-black text-sm text-slate-900">
+                            GH₵ {Number(c.amount).toFixed(2)}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className="bg-slate-50 px-6 py-3.5 border-t border-slate-200 flex items-center justify-between shrink-0">
+              <span className="text-xs text-slate-500 font-semibold">
+                Showing {filteredAuditRecordContributions.length} of {selectedAuditRecord.contributionCount} giving records
+              </span>
+              <div className="flex items-center space-x-2">
+                <button
+                  onClick={() => setIsPrintSlipOpen(true)}
+                  className="px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white rounded-xl text-xs font-bold transition flex items-center space-x-1.5 cursor-pointer shadow-sm"
+                >
+                  <Printer className="w-3.5 h-3.5" />
+                  <span>Print Audit Report</span>
+                </button>
+                <button
+                  onClick={() => {
+                    setSelectedAuditRecord(null);
+                    setAuditLedgerCategoryFilter('ALL');
+                    setAuditLedgerSearchTerm('');
+                  }}
+                  className="px-4 py-2 bg-white border border-slate-300 hover:bg-slate-100 text-slate-700 rounded-xl text-xs font-bold transition cursor-pointer"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Modal 2: Printable Official Service Financial Audit Certificate / Slip ── */}
+      {isPrintSlipOpen && selectedAuditRecord && (
+        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+          <div className="bg-white rounded-3xl w-full max-w-2xl shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200 max-h-[94vh] flex flex-col my-auto border border-slate-200">
+            {/* Top Bar for actions (hidden in print) */}
+            <div className="bg-slate-900 text-white px-6 py-3.5 flex items-center justify-between shrink-0 print:hidden">
+              <div className="flex items-center space-x-2">
+                <ShieldCheck className="w-5 h-5 text-emerald-400" />
+                <span className="font-extrabold text-sm">Official Service Financial Audit Slip</span>
+              </div>
+              <div className="flex items-center space-x-2">
+                <button
+                  onClick={() => window.print()}
+                  className="px-4 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-xs rounded-xl shadow-sm transition flex items-center space-x-1.5 cursor-pointer"
+                >
+                  <Printer className="w-3.5 h-3.5" />
+                  <span>Print Document</span>
+                </button>
+                <button
+                  onClick={() => setIsPrintSlipOpen(false)}
+                  className="p-1 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white transition cursor-pointer"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+
+            {/* Printable Document Body */}
+            <div className="p-8 overflow-y-auto space-y-6 flex-1 text-slate-800 bg-white" id="printable-audit-slip">
+              {/* Official CACI Header */}
+              <div className="text-center border-b-2 border-slate-900 pb-4 space-y-1">
+                <h1 className="text-lg font-black tracking-wider uppercase text-slate-950">
+                  CHRIST APOSTOLIC CHURCH INTERNATIONAL
+                </h1>
+                <p className="text-xs font-bold uppercase tracking-widest text-slate-600">
+                  Treasury & Financial Audit Board • Local Assembly
+                </p>
+                <div className="inline-block px-3 py-1 bg-slate-900 text-white text-[11px] font-extrabold uppercase tracking-wider rounded-md mt-1">
+                  Official Service Financial Audit Report
+                </div>
+              </div>
+
+              {/* Service Meta Details */}
+              <div className="grid grid-cols-2 gap-3 text-xs bg-slate-50 p-4 rounded-xl border border-slate-200 font-medium">
+                <div>
+                  <span className="text-slate-500 font-bold uppercase text-[10px] block">Service Type</span>
+                  <span className="font-extrabold text-slate-900 text-sm">{selectedAuditRecord.session.serviceType}</span>
+                </div>
+                <div>
+                  <span className="text-slate-500 font-bold uppercase text-[10px] block">Service Date</span>
+                  <span className="font-extrabold text-slate-900 text-sm">
+                    {new Date(selectedAuditRecord.session.serviceDate).toLocaleDateString(undefined, {
+                      weekday: 'long',
+                      year: 'numeric',
+                      month: 'long',
+                      day: 'numeric'
+                    })}
+                  </span>
+                </div>
+                {selectedAuditRecord.session.theme && (
+                  <div>
+                    <span className="text-slate-500 font-bold uppercase text-[10px] block">Sermon / Theme</span>
+                    <span className="font-bold text-slate-800">"{selectedAuditRecord.session.theme}"</span>
+                  </div>
+                )}
+                <div>
+                  <span className="text-slate-500 font-bold uppercase text-[10px] block">Audited Attendance</span>
+                  <span className="font-bold text-slate-800">{selectedAuditRecord.attendanceCount} Congregants</span>
+                </div>
+              </div>
+
+              {/* Collections by Category Table */}
+              <div className="space-y-2">
+                <h3 className="text-xs font-black uppercase tracking-wider text-slate-900 border-b border-slate-200 pb-1">
+                  1. Financial Collections by Category
+                </h3>
+                <table className="w-full text-xs">
+                  <tbody className="divide-y divide-slate-200 font-medium">
+                    <tr>
+                      <td className="py-1.5 font-bold text-slate-700">Covenant Tithes</td>
+                      <td className="py-1.5 text-right font-black text-slate-900">
+                        GH₵ {(selectedAuditRecord.categoryTotals.TITHE || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                      </td>
+                    </tr>
+                    <tr>
+                      <td className="py-1.5 font-bold text-slate-700">General Congregation Offering</td>
+                      <td className="py-1.5 text-right font-black text-slate-900">
+                        GH₵ {(selectedAuditRecord.categoryTotals.OFFERING || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                      </td>
+                    </tr>
+                    <tr>
+                      <td className="py-1.5 font-bold text-slate-700">Thanksgiving Offering</td>
+                      <td className="py-1.5 text-right font-black text-slate-900">
+                        GH₵ {(selectedAuditRecord.categoryTotals.THANKSGIVING || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                      </td>
+                    </tr>
+                    <tr>
+                      <td className="py-1.5 font-bold text-slate-700">Welfare & Benevolence</td>
+                      <td className="py-1.5 text-right font-black text-slate-900">
+                        GH₵ {(selectedAuditRecord.categoryTotals.WELFARE || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                      </td>
+                    </tr>
+                    <tr>
+                      <td className="py-1.5 font-bold text-slate-700">Building Fund Project</td>
+                      <td className="py-1.5 text-right font-black text-slate-900">
+                        GH₵ {(selectedAuditRecord.categoryTotals.BUILDING_PROJECT || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                      </td>
+                    </tr>
+                    <tr>
+                      <td className="py-1.5 font-bold text-slate-700">Special Seeds / Sacrificial Giving</td>
+                      <td className="py-1.5 text-right font-black text-slate-900">
+                        GH₵ {(selectedAuditRecord.categoryTotals.SPECIAL_SEED || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                      </td>
+                    </tr>
+                    <tr className="bg-slate-100 font-black text-sm text-slate-950 border-t-2 border-slate-900">
+                      <td className="py-2.5 px-2 uppercase tracking-wide">Grand Total Gained</td>
+                      <td className="py-2.5 px-2 text-right text-emerald-800 text-base">
+                        GH₵ {selectedAuditRecord.totalGained.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Cell Contributions Breakdown */}
+              <div className="space-y-2">
+                <h3 className="text-xs font-black uppercase tracking-wider text-slate-900 border-b border-slate-200 pb-1">
+                  2. Giving Performance Across Cells
+                </h3>
+                <div className="grid grid-cols-4 gap-2 text-center text-xs font-bold">
+                  <div className="p-2 rounded-lg bg-amber-50 border border-amber-200">
+                    <span className="text-[10px] text-amber-800 uppercase block">Joy Cell</span>
+                    <span className="text-xs text-amber-950 font-black block mt-0.5">
+                      GH₵ {(selectedAuditRecord.cellTotals.JOY || 0).toFixed(2)}
+                    </span>
+                  </div>
+                  <div className="p-2 rounded-lg bg-blue-50 border border-blue-200">
+                    <span className="text-[10px] text-blue-800 uppercase block">Faith Cell</span>
+                    <span className="text-xs text-blue-950 font-black block mt-0.5">
+                      GH₵ {(selectedAuditRecord.cellTotals.FAITH || 0).toFixed(2)}
+                    </span>
+                  </div>
+                  <div className="p-2 rounded-lg bg-emerald-50 border border-emerald-200">
+                    <span className="text-[10px] text-emerald-800 uppercase block">Hope Cell</span>
+                    <span className="text-xs text-emerald-950 font-black block mt-0.5">
+                      GH₵ {(selectedAuditRecord.cellTotals.HOPE || 0).toFixed(2)}
+                    </span>
+                  </div>
+                  <div className="p-2 rounded-lg bg-rose-50 border border-rose-200">
+                    <span className="text-[10px] text-rose-800 uppercase block">Love Cell</span>
+                    <span className="text-xs text-rose-950 font-black block mt-0.5">
+                      GH₵ {(selectedAuditRecord.cellTotals.LOVE || 0).toFixed(2)}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Payment Methods */}
+              <div className="space-y-1 text-xs font-semibold text-slate-600 bg-slate-50 p-3 rounded-xl border border-slate-200">
+                <span className="font-bold text-slate-800 block text-[11px] uppercase tracking-wider">
+                  Payment Channels:
+                </span>
+                <div className="flex items-center justify-between pt-1">
+                  <span>Physical Cash: <strong>GH₵ {(selectedAuditRecord.paymentMethodTotals.CASH || 0).toFixed(2)}</strong></span>
+                  <span>Mobile Money (MoMo): <strong>GH₵ {(selectedAuditRecord.paymentMethodTotals.MOBILE_MONEY || 0).toFixed(2)}</strong></span>
+                  <span>Bank Transfers: <strong>GH₵ {(selectedAuditRecord.paymentMethodTotals.BANK_TRANSFER || 0).toFixed(2)}</strong></span>
+                </div>
+              </div>
+
+              {/* Official Verification Signatures */}
+              <div className="pt-6 border-t-2 border-slate-900 grid grid-cols-3 gap-6 text-center text-xs">
+                <div className="space-y-6">
+                  <div className="border-b border-slate-400 h-8"></div>
+                  <div>
+                    <span className="font-extrabold text-slate-900 block text-[11px]">Prepared By</span>
+                    <span className="text-[10px] text-slate-500">Usher / Counting Officer</span>
+                  </div>
+                </div>
+
+                <div className="space-y-6">
+                  <div className="border-b border-slate-400 h-8"></div>
+                  <div>
+                    <span className="font-extrabold text-slate-900 block text-[11px]">Audited & Verified</span>
+                    <span className="text-[10px] text-slate-500">Finance Deacon / Treasurer</span>
+                  </div>
+                </div>
+
+                <div className="space-y-6">
+                  <div className="border-b border-slate-400 h-8"></div>
+                  <div>
+                    <span className="font-extrabold text-slate-900 block text-[11px]">Approved By</span>
+                    <span className="text-[10px] text-slate-500">Resident Minister / Pastor</span>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       )}
